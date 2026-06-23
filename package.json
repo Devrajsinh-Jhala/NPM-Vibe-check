@@ -1,7 +1,7 @@
 {
   "name": "npx-vibe",
-  "version": "0.1.0",
-  "description": "A cautious npx wrapper that checks registry risk, install hooks, package tarballs, and optional AI review before execution.",
+  "version": "0.1.1",
+  "description": "A professional npx safety wrapper that checks npm registry risk, install hooks, tarballs, GitHub metadata, and optional AI review before execution.",
   "type": "module",
   "homepage": "https://devrajsinh-jhala.github.io/NPM-Vibe-check/",
   "repository": {
@@ -34,7 +34,10 @@
     "security",
     "supply-chain",
     "cli",
-    "ollama"
+    "ollama",
+    "malware",
+    "package-security",
+    "ai-security"
   ],
   "license": "MIT"
 }

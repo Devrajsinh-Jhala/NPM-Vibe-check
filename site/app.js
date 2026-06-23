@@ -65,21 +65,22 @@ tabs.forEach((tab) => {
 
 setDemo("proceed");
 
-const copyButton = document.querySelector("[data-copy]");
-copyButton?.addEventListener("click", async () => {
-  const text = copyButton.dataset.copy;
-  try {
-    await navigator.clipboard.writeText(text);
-    copyButton.textContent = "Copied";
+document.querySelectorAll("[data-copy]").forEach((copyButton) => {
+  const defaultText = copyButton.textContent;
+
+  copyButton.addEventListener("click", async () => {
+    const text = copyButton.dataset.copy;
+    try {
+      await navigator.clipboard.writeText(text);
+      copyButton.textContent = "Copied";
+    } catch {
+      copyButton.textContent = "Copy failed";
+    }
+
     setTimeout(() => {
-      copyButton.textContent = "Copy";
+      copyButton.textContent = defaultText;
     }, 1300);
-  } catch {
-    copyButton.textContent = "Copy failed";
-    setTimeout(() => {
-      copyButton.textContent = "Copy";
-    }, 1300);
-  }
+  });
 });
 
 const observer = new IntersectionObserver(
