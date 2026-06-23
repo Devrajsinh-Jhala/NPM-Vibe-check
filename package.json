@@ -12,7 +12,7 @@
     "url": "https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/issues"
   },
   "bin": {
-    "npx-vibe": "./bin/npx-vibe.js"
+    "npx-vibe": "bin/npx-vibe.js"
   },
   "files": [
     "bin",
