@@ -1,0 +1,267 @@
+const PROVIDERS = {
+  "openai-compatible": {
+    family: "chat",
+    label: "OpenAI-compatible",
+    keyNames: ["NPX_VIBE_API_KEY"],
+    defaultUrl: "https://api.openai.com/v1/chat/completions",
+    defaultModel: "gpt-4.1-mini",
+  },
+  openai: {
+    family: "chat",
+    label: "OpenAI",
+    keyNames: ["OPENAI_API_KEY", "NPX_VIBE_API_KEY"],
+    defaultUrl: "https://api.openai.com/v1/chat/completions",
+    defaultModel: "gpt-4.1-mini",
+  },
+  openrouter: {
+    family: "chat",
+    label: "OpenRouter",
+    keyNames: ["OPENROUTER_API_KEY", "NPX_VIBE_API_KEY"],
+    defaultUrl: "https://openrouter.ai/api/v1/chat/completions",
+    defaultModel: "openai/gpt-4.1-mini",
+  },
+  groq: {
+    family: "chat",
+    label: "Groq",
+    keyNames: ["GROQ_API_KEY", "NPX_VIBE_API_KEY"],
+    defaultUrl: "https://api.groq.com/openai/v1/chat/completions",
+    defaultModel: "llama-3.3-70b-versatile",
+  },
+  together: {
+    family: "chat",
+    label: "Together AI",
+    keyNames: ["TOGETHER_API_KEY", "NPX_VIBE_API_KEY"],
+    defaultUrl: "https://api.together.xyz/v1/chat/completions",
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+  },
+  anthropic: {
+    family: "anthropic",
+    label: "Anthropic",
+    keyNames: ["ANTHROPIC_API_KEY", "NPX_VIBE_API_KEY"],
+    defaultUrl: "https://api.anthropic.com/v1/messages",
+    defaultModel: "claude-3-5-haiku-latest",
+  },
+  gemini: {
+    family: "gemini",
+    label: "Gemini",
+    keyNames: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "NPX_VIBE_API_KEY"],
+    defaultUrl: "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+    defaultModel: "gemini-1.5-flash",
+  },
+};
+
+export function providerNames() {
+  return Object.keys(PROVIDERS);
+}
+
+export function hasOnlineCredentials(config = {}) {
+  if (config.apiKey || config.apiUrl) {
+    return true;
+  }
+  return Object.values(config.apiKeys ?? {}).some(Boolean);
+}
+
+export function resolveOnlineProvider(config = {}) {
+  const requested = normalizeProviderName(config.provider ?? "auto");
+  const detectedName = requested === "auto" ? detectProviderName(config) : requested;
+  const name = PROVIDERS[detectedName] ? detectedName : "openai-compatible";
+  const definition = PROVIDERS[name];
+  const apiKey = config.apiKey ?? firstConfiguredKey(definition, config)?.value ?? null;
+  const model = config.model ?? definition.defaultModel;
+  const rawUrl = config.apiUrl ?? definition.defaultUrl;
+
+  return {
+    name,
+    label: definition.label,
+    family: definition.family,
+    apiKey,
+    model,
+    url: rawUrl.replace("{model}", encodeURIComponent(model)),
+    keyHint: definition.keyNames.join(" or "),
+  };
+}
+
+export async function callResolvedProvider(provider, messages, config = {}) {
+  if (provider.family === "chat") {
+    return fetchJsonLike(provider.url, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${provider.apiKey}`,
+        "content-type": "application/json",
+        ...extraHeaders(provider, config),
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages,
+      }),
+      timeoutMs: config.aiTimeoutMs ?? 30_000,
+    });
+  }
+
+  if (provider.family === "anthropic") {
+    return fetchJsonLike(provider.url, {
+      method: "POST",
+      headers: {
+        "x-api-key": provider.apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        max_tokens: Number(config.aiMaxTokens ?? 1_500),
+        temperature: 0,
+        system: messages.find((message) => message.role === "system")?.content ?? "",
+        messages: messages
+          .filter((message) => message.role !== "system")
+          .map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", content: message.content })),
+      }),
+      timeoutMs: config.aiTimeoutMs ?? 30_000,
+    });
+  }
+
+  if (provider.family === "gemini") {
+    const system = messages.find((message) => message.role === "system")?.content ?? "";
+    const user = messages
+      .filter((message) => message.role !== "system")
+      .map((message) => message.content)
+      .join("\n\n");
+    const separator = provider.url.includes("?") ? "&" : "?";
+    const url = `${provider.url}${separator}key=${encodeURIComponent(provider.apiKey)}`;
+
+    return fetchJsonLike(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        generationConfig: {
+          temperature: 0,
+          responseMimeType: "application/json",
+        },
+      }),
+      timeoutMs: config.aiTimeoutMs ?? 30_000,
+    });
+  }
+
+  throw new Error(`Unsupported provider family: ${provider.family}`);
+}
+
+export function extractProviderText(response, provider) {
+  if (provider.family === "chat") {
+    return response.choices?.[0]?.message?.content;
+  }
+  if (provider.family === "anthropic") {
+    return response.content?.find((part) => part?.type === "text")?.text;
+  }
+  if (provider.family === "gemini") {
+    return response.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("\n");
+  }
+  return null;
+}
+
+function detectProviderName(config) {
+  if (config.apiUrl) {
+    return "openai-compatible";
+  }
+  if (config.apiKey) {
+    return inferProviderFromKey(config.apiKey);
+  }
+
+  for (const [provider, keyName] of [
+    ["openai", "OPENAI_API_KEY"],
+    ["anthropic", "ANTHROPIC_API_KEY"],
+    ["gemini", "GEMINI_API_KEY"],
+    ["gemini", "GOOGLE_API_KEY"],
+    ["openrouter", "OPENROUTER_API_KEY"],
+    ["groq", "GROQ_API_KEY"],
+    ["together", "TOGETHER_API_KEY"],
+    ["openai-compatible", "NPX_VIBE_API_KEY"],
+  ]) {
+    if (config.apiKeys?.[keyName]) {
+      return provider;
+    }
+  }
+
+  return "openai-compatible";
+}
+
+function inferProviderFromKey(apiKey) {
+  const key = String(apiKey);
+  if (key.startsWith("sk-ant-")) {
+    return "anthropic";
+  }
+  if (key.startsWith("AIza")) {
+    return "gemini";
+  }
+  if (key.startsWith("gsk_")) {
+    return "groq";
+  }
+  if (key.startsWith("sk-or-")) {
+    return "openrouter";
+  }
+  return "openai-compatible";
+}
+
+function firstConfiguredKey(definition, config) {
+  for (const keyName of definition.keyNames) {
+    const value = config.apiKeys?.[keyName];
+    if (value) {
+      return { keyName, value };
+    }
+  }
+  return null;
+}
+
+function extraHeaders(provider, config) {
+  if (provider.name !== "openrouter") {
+    return {};
+  }
+  return {
+    ...(config.appUrl ? { "HTTP-Referer": config.appUrl } : {}),
+    "X-Title": "npx-vibe",
+  };
+}
+
+function normalizeProviderName(value) {
+  const normalized = String(value ?? "auto").trim().toLowerCase();
+  if (normalized === "google" || normalized === "google-gemini") {
+    return "gemini";
+  }
+  if (normalized === "claude") {
+    return "anthropic";
+  }
+  if (normalized === "custom") {
+    return "openai-compatible";
+  }
+  return normalized;
+}
+
+async function fetchJsonLike(url, options) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: options.method,
+      headers: options.headers,
+      body: options.body,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`${response.status} ${response.statusText}${body ? `: ${body.slice(0, 300)}` : ""}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`Timed out after ${options.timeoutMs}ms.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
