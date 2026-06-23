@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>npx-vibe — vibe check npm packages before you run them</title>
+    <title>npx-vibe - vibe check npm packages before you run them</title>
     <meta
       name="description"
       content="npx-vibe is a cautious npx wrapper that checks npm packages, install hooks, tarballs, registry signals, GitHub metadata, and optional AI review before execution."
     />
-    <meta property="og:title" content="npx-vibe — vibe check packages before you run them" />
+    <meta property="og:title" content="npx-vibe - vibe check packages before you run them" />
     <meta
       property="og:description"
-      content="A beautiful CLI safety pause for npx: registry heuristics, tarball scanning, metadata context, and optional AI review."
+      content="A polished CLI safety pause for npx: registry heuristics, tarball scanning, metadata context, and optional AI review."
     />
     <meta property="og:type" content="website" />
     <meta name="theme-color" content="#0c0f17" />
@@ -37,34 +37,42 @@
           <a href="#providers">AI</a>
           <a href="#privacy">Privacy</a>
         </div>
-        <a class="github-pill" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
+        <div class="nav-actions">
+          <a class="npm-pill" href="https://www.npmjs.com/package/npx-vibe">npm</a>
+          <a class="github-pill" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
+        </div>
       </nav>
 
       <section id="top" class="hero-grid">
         <div class="hero-copy reveal">
-          <p class="eyebrow">npm supply-chain safety, before execution</p>
-          <h1>Vibe check packages before you run them.</h1>
+          <p class="eyebrow">Published on npm</p>
+          <a class="release-badge" href="https://www.npmjs.com/package/npx-vibe" aria-label="View npx-vibe on npm">
+            <span class="pulse-dot"></span>
+            <strong>npx-vibe is live</strong>
+            <span>View package →</span>
+          </a>
+          <h1>Run npm packages with a safety pause.</h1>
           <p class="lede">
-            A lightweight CLI wrapper for suspicious <code>npx</code> moments. It checks
-            package age, downloads, install hooks, tarball contents, GitHub metadata,
-            and optional AI review before code gets a chance to execute.
+            Keep the speed of <code>npx</code>, but add a pre-flight review for package age,
+            downloads, install hooks, tarball contents, GitHub activity, and optional AI
+            analysis before code gets a chance to execute.
           </p>
           <div class="cta-row">
-            <a class="button primary" href="#install">Try the command</a>
+            <a class="button primary" href="#install">Install from npm</a>
             <a class="button secondary" href="#demo">Watch the demo</a>
           </div>
           <div class="trust-row" aria-label="Project highlights">
+            <span>Public npm package</span>
             <span>No runtime deps</span>
             <span>Ollama or online AI</span>
-            <span>GitHub Pages ready</span>
           </div>
         </div>
 
         <div class="hero-visual reveal" aria-label="Animated package scan preview">
-          <div class="scan-card package-card float-a">
-            <span class="mini-label">package</span>
-            <strong>obscure-helper@0.1.2</strong>
-            <small>created 2 days ago · 31 downloads/week</small>
+          <div class="scan-card npm-card float-a">
+            <span class="mini-label">npm package</span>
+            <strong>npx-vibe</strong>
+            <small>published • use with one command</small>
           </div>
           <div class="scan-card hook-card float-b">
             <span class="mini-label warn">install hook</span>
@@ -94,12 +102,28 @@ Action: blocked unless --force is supplied.</code></pre>
 
     <main class="site-shell">
       <section class="logo-strip reveal" aria-label="Risk signals checked by npx-vibe">
+        <a href="https://www.npmjs.com/package/npx-vibe">npm package</a>
         <span>age</span>
         <span>downloads</span>
         <span>install scripts</span>
         <span>tarball integrity</span>
         <span>GitHub activity</span>
         <span>AI review</span>
+      </section>
+
+      <section class="section release-panel reveal">
+        <div>
+          <p class="eyebrow">package is live</p>
+          <h2>Install it from npm and share the link.</h2>
+          <p>
+            The package is published as <code>npx-vibe</code>, with the same README powering
+            the npm page and GitHub repository docs.
+          </p>
+        </div>
+        <div class="release-actions">
+          <a class="button primary" href="https://www.npmjs.com/package/npx-vibe">Open npm package</a>
+          <a class="button secondary" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">Open GitHub repo</a>
+        </div>
       </section>
 
       <section id="demo" class="section demo-section reveal">
@@ -141,17 +165,29 @@ Action: blocked unless --force is supplied.</code></pre>
       <section id="install" class="section install-panel reveal">
         <div>
           <p class="eyebrow">one command</p>
-          <h2>Use it like npx, but with a safety pause.</h2>
+          <h2>Use it like npx, but with a visible checkpoint.</h2>
           <p>
             The fast path is deterministic and does not require an AI key. If risk
             signals show up, npx-vibe can escalate to local Ollama or an online model.
           </p>
         </div>
-        <div class="copy-card">
-          <button class="copy-button" type="button" data-copy="npx npx-vibe --check esbuild">Copy</button>
-          <pre><code>npx npx-vibe --check esbuild
-npm install -g npx-vibe
-npx-vibe obscure-package</code></pre>
+        <div class="install-stack">
+          <div class="copy-card command-card">
+            <button class="copy-button" type="button" data-copy="npx npx-vibe --check esbuild">Copy</button>
+            <pre><code>npx npx-vibe --check esbuild</code></pre>
+          </div>
+          <div class="mini-command-grid">
+            <div class="copy-card mini-command">
+              <button class="copy-button" type="button" data-copy="npm install -g npx-vibe">Copy</button>
+              <span>Install globally</span>
+              <pre><code>npm install -g npx-vibe</code></pre>
+            </div>
+            <div class="copy-card mini-command">
+              <button class="copy-button" type="button" data-copy="npx-vibe obscure-package">Copy</button>
+              <span>Run with review</span>
+              <pre><code>npx-vibe obscure-package</code></pre>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -232,7 +268,10 @@ npx-vibe obscure-package</code></pre>
 
     <footer class="site-shell footer">
       <p>Built for developers who like speed, but not surprise install scripts.</p>
-      <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">Star it on GitHub</a>
+      <div class="footer-links">
+        <a href="https://www.npmjs.com/package/npx-vibe">npm</a>
+        <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
+      </div>
     </footer>
   </body>
 </html>
