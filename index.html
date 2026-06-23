@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>npx-vibe — vibe check packages before you run them</title>
+    <meta
+      name="description"
+      content="npx-vibe is a cautious npx wrapper that checks npm packages, install hooks, tarballs, registry signals, and optional AI review before execution."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <nav class="nav">
+          <div class="brand">npx-vibe</div>
+          <div class="links">
+            <a href="#install">Install</a>
+            <a href="#features">Features</a>
+            <a href="#privacy">Privacy</a>
+            <a href="#providers">AI</a>
+          </div>
+        </nav>
+
+        <div class="hero-grid">
+          <div>
+            <p class="eyebrow">npm supply-chain safety, before execution</p>
+            <h1>Vibe check packages before you run them.</h1>
+            <p class="lede">
+              Replace a risky <code>npx obscure-package</code> with
+              <code>npx npx-vibe obscure-package</code>. It inspects registry signals,
+              install hooks, tarballs, package metadata, and optional AI review before
+              letting code execute.
+            </p>
+            <div class="cta-row">
+              <a class="button primary" href="#install">Try it</a>
+              <a class="button secondary" href="#how-it-works">How it works</a>
+            </div>
+          </div>
+
+          <div class="terminal" aria-label="npx-vibe terminal example">
+            <div class="terminal-bar">
+              <span></span><span></span><span></span>
+            </div>
+            <pre><code>$ npx-vibe esbuild --check
+! npx-vibe: Caution  risk 46/100
+esbuild@0.28.1
+
+NPM updated: 2026-06-11
+Version published: 2026-06-11
+Repository: github.com/evanw/esbuild
+GitHub: 39,955 stars
+Last commit: 6ff1d8b0d8c1
+
+Install hooks: postinstall
+AI review: unavailable
+
+Action: review recommended before execution.</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" class="panel">
+        <h2>Use it like npx, but with a safety pause.</h2>
+        <div class="code-card">
+          <pre><code>npx npx-vibe cowsay -- hello
+npm install -g npx-vibe
+npx-vibe --check obscure-package
+npx npx-vibe --json suspicious-package</code></pre>
+        </div>
+        <p>
+          The fast path is deterministic and does not require an AI key. If a package
+          trips risk signals, npx-vibe can escalate to local Ollama or an online AI
+          provider.
+        </p>
+      </section>
+
+      <section id="features" class="cards">
+        <article>
+          <h3>Registry heuristics</h3>
+          <p>Checks age, weekly downloads, version publish date, maintainers, license, npm update time, and repository metadata.</p>
+        </article>
+        <article>
+          <h3>Tarball inspection</h3>
+          <p>Downloads the package tarball without executing code, verifies integrity, and inspects install scripts and suspicious files.</p>
+        </article>
+        <article>
+          <h3>Readable verdicts</h3>
+          <p>Prints a terminal dashboard with Proceed, Caution, or Block, plus the evidence behind the call.</p>
+        </article>
+      </section>
+
+      <section id="how-it-works" class="split">
+        <div>
+          <h2>How it works</h2>
+          <ol>
+            <li>Resolve the exact npm package version.</li>
+            <li>Fetch registry and download metadata.</li>
+            <li>Download and inspect the tarball safely.</li>
+            <li>Run deterministic static heuristics.</li>
+            <li>Optionally ask Ollama or an online model for review.</li>
+            <li>Execute only after the verdict policy allows it.</li>
+          </ol>
+        </div>
+        <div class="mini-terminal">
+          <pre><code>✓ Proceed
+! Caution
+✕ Block</code></pre>
+        </div>
+      </section>
+
+      <section id="providers" class="panel">
+        <h2>Bring your own AI key, or keep it local.</h2>
+        <p>
+          Online mode supports OpenAI-compatible APIs, OpenAI, Anthropic, Gemini,
+          OpenRouter, Groq, and Together AI. Local mode supports Ollama.
+        </p>
+        <div class="code-card">
+          <pre><code>OPENAI_API_KEY=... npx npx-vibe --ai online pkg
+ANTHROPIC_API_KEY=... npx npx-vibe --ai online pkg
+npx npx-vibe --ai ollama --ollama-model qwen2.5-coder pkg</code></pre>
+        </div>
+      </section>
+
+      <section id="privacy" class="panel dark">
+        <h2>Privacy boundary</h2>
+        <p>
+          npx-vibe never sends your local project files, npm tokens, shell history,
+          or environment variables to a model. AI review receives only bounded package
+          metadata, deterministic findings, install scripts, and selected files from
+          the npm tarball.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Built for developers who like speed, but not surprise install scripts.</p>
+    </footer>
+  </body>
+</html>
