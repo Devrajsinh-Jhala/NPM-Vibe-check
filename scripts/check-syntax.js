@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -6,10 +6,11 @@ const files = [
   "bin/npx-vibe.js",
   "scripts/check-syntax.js",
   "scripts/serve-site.js",
+  "site/app.js",
   ...readdirSync("src")
     .filter((name) => name.endsWith(".js"))
     .map((name) => join("src", name)),
-];
+].filter((file) => existsSync(file));
 
 for (const file of files) {
   const result = spawnSync(process.execPath, ["--check", file], {
