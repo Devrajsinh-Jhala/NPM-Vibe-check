@@ -96,9 +96,14 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "n
 
 async function loadDownloadMomentum() {
   const status = document.querySelector("[data-download-status]");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
 
   try {
-    const response = await fetch(DOWNLOAD_API, { headers: { accept: "application/json" } });
+    const response = await fetch(DOWNLOAD_API, {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    });
     if (!response.ok) throw new Error(`npm API returned ${response.status}`);
 
     const payload = await response.json();
@@ -124,6 +129,8 @@ async function loadDownloadMomentum() {
     if (status) status.textContent = "Live API unavailable · showing last known value";
     document.querySelector("[data-download-dashboard]")?.classList.add("is-stale");
     console.warn("Could not refresh npm download count:", error.message);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
