@@ -2,223 +2,142 @@
 
 [![npm version](https://img.shields.io/npm/v/npx-vibe.svg?color=22d3ee)](https://www.npmjs.com/package/npx-vibe)
 [![npm downloads](https://img.shields.io/npm/dw/npx-vibe.svg?color=34d399)](https://www.npmjs.com/package/npx-vibe)
+[![CI](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/node/v/npx-vibe.svg)](https://www.npmjs.com/package/npx-vibe)
 [![License: MIT](https://img.shields.io/npm/l/npx-vibe.svg)](./LICENSE)
 
-**npx-vibe** is a cautious `npx` wrapper that checks npm packages before they run on your machine.
+**Evidence-first safety checks for npm packages before `npx` executes them.**
 
-It performs fast deterministic supply-chain checks first, then optionally escalates suspicious packages to local Ollama or an online AI provider for install-script review. The goal is simple: keep the convenience of `npx`, but add a visible safety pause before unknown package code executes.
+`npx-vibe` resolves a package from the public npm registry, downloads and verifies its tarball without executing it, inspects install-time code, and prints a clear **Proceed**, **Caution**, or **Block** verdict.
 
-- npm: [npmjs.com/package/npx-vibe](https://www.npmjs.com/package/npx-vibe)
-- Website: [devrajsinh-jhala.github.io/NPM-Vibe-check](https://devrajsinh-jhala.github.io/NPM-Vibe-check/)
-- GitHub: [Devrajsinh-Jhala/NPM-Vibe-check](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check)
+The default scan is deterministic, local, and requires no account or API key. AI review is optional and opt-in.
 
-## Install
+- [npm package](https://www.npmjs.com/package/npx-vibe)
+- [Live website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/)
+- [GitHub repository](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check)
+- [Security policy](./SECURITY.md)
+- [Changelog](./CHANGELOG.md)
 
-Run without installing globally:
+## Quick start
+
+Review a package without executing it:
 
 ```bash
 npx npx-vibe --check esbuild
 ```
 
-Or install once:
+Use it as a guarded replacement for `npx`:
+
+```bash
+npx npx-vibe cowsay -- hello from npx-vibe
+```
+
+Or install the command globally:
 
 ```bash
 npm install -g npx-vibe
-npx-vibe --check esbuild
+npx-vibe --check <package>
 ```
 
-Use it like `npx` when you actually want to execute a package:
+## Why developers use it
 
-```bash
-npx npx-vibe cowsay -- hello from a safer npx
+Running `npx some-package` can download code and execute a package binary immediately. Packages may also declare lifecycle scripts that run during installation.
+
+`npx-vibe` inserts a visible checkpoint before execution:
+
+1. Resolve the exact npm package version.
+2. Fetch registry, download, maintainer, publisher, and repository context.
+3. Download the tarball without running package code.
+4. Verify npm integrity metadata and inspect bounded source files.
+5. Show matched evidence and a risk verdict.
+6. Execute only after the verdict allows it.
+
+By default, execution uses npm with install scripts ignored. Use `--allow-install-scripts` only when you intentionally want reviewed root lifecycle scripts to run.
+
+## Evidence, not mystery scores
+
+Every deterministic source finding includes the matched line and a bounded excerpt. Registry popularity is displayed separately as context and never overrides suspicious code.
+
+```text
+$ npx npx-vibe --check esbuild
+! npx-vibe: Caution  risk 43/100
+esbuild@0.28.1
+
+Downloads: 241,858,907/week  Package age: 3132d  Version age: 12d
+Install hooks: postinstall
+Established signals: long registry history, high weekly adoption, linked GitHub repository
+Registry popularity and age provide context, but never override code findings.
+AI review: skipped (Heuristic-only mode; AI was not requested.)
+
+Findings:
+- MEDIUM   lifecycle_hook in package.json
+  postinstall runs: node install.js
+  Evidence: postinstall: node install.js
+- MEDIUM   network_and_shell in install.js
+  Code combines network access with shell execution.
+  Evidence line 147: fetch(url) ... child_process.execSync(...)
+
+Action: review recommended before execution.
 ```
 
-## Why this exists
-
-Modern JavaScript workflows often ask developers to run packages directly from the registry:
-
-```bash
-npx some-new-cli
-```
-
-That is convenient, but risky. A package can include install hooks, obfuscated setup files, or suspicious network behavior before you have had a chance to inspect it. `npx-vibe` adds a pre-flight review step that checks the package metadata and tarball before execution.
+A popular package can still receive **Caution** when it performs sensitive install-time behavior. That is intentional: maturity is useful context, not a security exemption.
 
 ## What it checks
 
 | Area | Signals |
 | --- | --- |
-| Registry trust | package age, version publish age, weekly downloads, maintainers, publisher, license |
-| Install behavior | `preinstall`, `install`, `postinstall`, `prepare`, setup files, shell usage |
-| Tarball safety | downloads the npm tarball without executing package code, verifies registry integrity |
-| Source signals | suspicious file names, environment variable access, network calls, encoded payloads |
-| Repository context | GitHub repository, stars, latest commit, last push, repository freshness |
-| AI review | optional Ollama or online model review for suspicious install-time code |
+| Registry context | package age, version age, weekly downloads, maintainers, publisher, license, deprecation |
+| Install behavior | `preinstall`, `install`, `postinstall`, `prepare`, and related script targets |
+| Tarball safety | npm integrity verification, unsafe paths, escaping symlinks, archive size and entry limits |
+| Source behavior | secret/environment access, network calls, shell execution, external payloads, obfuscation, persistence, mining indicators |
+| Dependency metadata | remote Git/HTTP/file dependency protocols and lockfile install-script indicators |
+| Repository context | GitHub repository, stars, last update, last push, and latest commit |
+| Optional AI | local Ollama or supported online providers, used only after explicit opt-in and a heuristic trigger |
 
-## Example output
+## Verdicts
 
-```text
-$ npx npx-vibe --check obscure-helper
-✕ npx-vibe: Block  risk 92/100
-obscure-helper@0.0.3
-Fresh package with install-time credential access.
+| Verdict | Meaning | Check-mode exit code |
+| --- | --- | --- |
+| **Proceed** | No meaningful deterministic risk signal was found | `0` |
+| **Caution** | Reviewable behavior or incomplete context requires human judgment | `2` |
+| **Block** | Critical behavior or a high-risk review result was detected | `3` |
+| Operational error | Registry, network, input, or internal failure | `1` |
 
-NPM updated: today  Version published: today
-License: unknown  Maintainers: 1  Publisher: new-user
-Repository: unknown
-Downloads: 12/week
-Install hooks: preinstall, postinstall
-AI review: online model (high confidence)
-
-Findings:
-- CRITICAL possible_secret_exfiltration in setup.js
-- CRITICAL download_and_execute in postinstall.js
-
-Action: blocked unless --force is supplied.
-```
-
-Verdicts:
-
-- **Proceed** — no meaningful risk signals found.
-- **Caution** — suspicious or incomplete signals; review before executing.
-- **Block** — high-risk behavior detected.
+A verdict is a decision aid, not proof that a package is safe or malicious.
 
 ## Usage
 
-```bash
-npx-vibe [options] <package-spec> [-- package args]
+```text
+npx-vibe [options] <package-spec> [-- package arguments]
 ```
 
 Common commands:
 
 ```bash
-# Review only, do not execute
+# Heuristic-only review; do not execute
 npx npx-vibe --check <package>
 
-# Print machine-readable JSON
+# Machine-readable output
 npx npx-vibe --json <package>
 
-# Review, then execute if allowed
-npx npx-vibe <package> -- <package args>
+# Review, then execute when permitted
+npx npx-vibe <package> -- <arguments>
 
-# Disable AI completely
-npx npx-vibe --ai off <package>
+# Execute a Caution verdict without prompting
+npx npx-vibe --yes <package>
+
+# Execute a Block verdict intentionally
+npx npx-vibe --force <package>
 ```
 
-## AI review options
+Useful options:
 
-`npx-vibe` does not require AI. The default path is deterministic and fast.
-
-```bash
-npx npx-vibe --ai off <package>       # static checks only
-npx npx-vibe --ai auto <package>      # use AI only when useful and configured
-npx npx-vibe --ai ollama <package>    # local model through Ollama
-npx npx-vibe --ai online <package>    # online provider
-```
-
-### Local Ollama
-
-```bash
-npx npx-vibe --ai ollama --ollama-model qwen2.5-coder <package>
-```
-
-### Online providers
-
-Online mode is provider-agnostic. Use a provider-specific environment variable, or pass one key directly with `--api-key` / `NPX_VIBE_API_KEY`.
-
-Auto-detected provider keys:
-
-```bash
-OPENAI_API_KEY=... npx npx-vibe --ai online <package>
-ANTHROPIC_API_KEY=... npx npx-vibe --ai online <package>
-GEMINI_API_KEY=... npx npx-vibe --ai online <package>
-OPENROUTER_API_KEY=... npx npx-vibe --ai online <package>
-GROQ_API_KEY=... npx npx-vibe --ai online <package>
-TOGETHER_API_KEY=... npx npx-vibe --ai online <package>
-```
-
-Explicit provider examples:
-
-```bash
-npx npx-vibe --ai online --provider anthropic --api-key sk-ant-... <package>
-npx npx-vibe --ai online --provider gemini --api-key AIza... <package>
-npx npx-vibe --ai online --provider openrouter --api-key sk-or-... <package>
-```
-
-Custom OpenAI-compatible endpoint:
-
-```bash
-npx npx-vibe --ai online \
-  --provider custom \
-  --api-url https://models.example.com/v1/chat/completions \
-  --api-key ... \
-  --model your-model \
-  <package>
-```
-
-Supported presets:
-
-- `openai`
-- `anthropic`
-- `gemini`
-- `openrouter`
-- `groq`
-- `together`
-- `custom` / `openai-compatible`
-
-## Privacy model
-
-`npx-vibe` is designed to avoid leaking your local workspace.
-
-It does **not** send these to AI providers:
-
-- local project files
-- npm tokens
-- shell history
-- your environment variables
-- files outside the downloaded npm package tarball
-
-When AI review is enabled, it sends only bounded package metadata, deterministic findings, install scripts, and selected files from the downloaded npm tarball.
-
-## Exit codes
-
-For `--check` and `--json`:
-
-| Code | Meaning |
-| --- | --- |
-| `0` | Proceed |
-| `1` | Operational error |
-| `2` | Caution / incomplete review |
-| `3` | Block |
-
-In execution mode, a permitted package run exits with the child process exit code.
-
-## Configuration
-
-Environment variables:
-
-```bash
-NPX_VIBE_AI=auto
-NPX_VIBE_PROVIDER=auto
-NPX_VIBE_API_KEY=...
-NPX_VIBE_API_URL=https://api.openai.com/v1/chat/completions
-NPX_VIBE_MODEL=gpt-4.1-mini
-NPX_VIBE_OLLAMA_URL=http://127.0.0.1:11434
-NPX_VIBE_OLLAMA_MODEL=qwen2.5-coder
-NPX_VIBE_AGE_DAYS=14
-NPX_VIBE_DOWNLOADS=1000
-NPX_VIBE_CAUTION_SCORE=40
-NPX_VIBE_BLOCK_SCORE=70
-```
-
-Useful flags:
-
-```bash
+```text
 --check
 --json
---yes
+--yes, -y
 --force
---ai auto|off|online|ollama
+--ai off|auto|online|ollama
 --provider auto|openai|anthropic|gemini|openrouter|groq|together|custom
 --model <name>
 --api-key <key>
@@ -231,17 +150,92 @@ Useful flags:
 --caution-score <0-100>
 --block-score <0-100>
 --allow-install-scripts
+--no-color
 ```
 
-## Current scope
+Run `npx npx-vibe --help` for the complete CLI reference.
 
-This MVP supports npm registry package specs, dist-tags, exact versions, and common semver ranges.
+## AI is optional and opt-in
 
-It intentionally rejects arbitrary tarball URLs, Git URLs, and local paths in v1. That keeps the trust boundary narrow and easier to reason about.
+Ambient keys such as `OPENAI_API_KEY` or `GEMINI_API_KEY` do **not** activate AI in the default mode.
 
-## Disclaimer
+```bash
+npx npx-vibe <package>                         # heuristic-only default
+npx npx-vibe --api-key <key> <package>         # online AI shortcut
+npx npx-vibe --ai online <package>             # use an explicitly configured online provider
+npx npx-vibe --ai auto <package>               # detect configured provider or local Ollama
+npx npx-vibe --ai ollama <package>             # local Ollama
+```
 
-`npx-vibe` is a developer safety tool, not a guarantee that a package is safe. Treat `Proceed` as a useful signal, not a security proof. Always review high-risk packages manually before execution.
+Provider-specific keys are read only after `--ai online` or `--ai auto` is selected:
+
+```bash
+OPENAI_API_KEY=... npx npx-vibe --ai online <package>
+ANTHROPIC_API_KEY=... npx npx-vibe --ai online <package>
+GEMINI_API_KEY=... npx npx-vibe --ai online <package>
+OPENROUTER_API_KEY=... npx npx-vibe --ai online <package>
+GROQ_API_KEY=... npx npx-vibe --ai online <package>
+TOGETHER_API_KEY=... npx npx-vibe --ai online <package>
+```
+
+Custom OpenAI-compatible endpoint:
+
+```bash
+npx npx-vibe --ai online \
+  --provider custom \
+  --api-url https://models.example.com/v1/chat/completions \
+  --api-key <key> \
+  --model <model> \
+  <package>
+```
+
+Online AI receives bounded package metadata, deterministic findings, install scripts, and selected files from the downloaded package tarball. It does not receive your project files, shell history, npm tokens, or environment-variable values.
+
+## Automation and CI
+
+Use JSON plus exit codes in CI or local automation:
+
+```bash
+npx npx-vibe --json <package> > npx-vibe-report.json
+```
+
+The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. npm publishing automatically runs syntax checks and the complete test suite through `prepublishOnly`.
+
+## Configuration
+
+```bash
+NPX_VIBE_AI=off
+NPX_VIBE_PROVIDER=auto
+NPX_VIBE_API_KEY=...
+NPX_VIBE_API_URL=https://api.openai.com/v1/chat/completions
+NPX_VIBE_MODEL=gpt-4.1-mini
+NPX_VIBE_OLLAMA_URL=http://127.0.0.1:11434
+NPX_VIBE_OLLAMA_MODEL=qwen2.5-coder
+NPX_VIBE_AGE_DAYS=14
+NPX_VIBE_DOWNLOADS=1000
+NPX_VIBE_CAUTION_SCORE=40
+NPX_VIBE_BLOCK_SCORE=70
+```
+
+## Supported scope
+
+`npx-vibe` supports public npm registry package names, scoped packages, dist-tags, exact versions, and common semver ranges. It intentionally rejects local paths, arbitrary tarball URLs, and Git URLs to keep the trust boundary narrow.
+
+Node.js 20 or newer is required. The project is tested on current Windows, macOS, and Linux GitHub-hosted runners.
+
+## Security boundary
+
+`npx-vibe` is a pre-execution risk scanner. It is not a sandbox, antivirus engine, formal audit, or guarantee of safety. A package may hide behavior in unselected files, dependencies, runtime branches, native code, or remote responses.
+
+- Treat **Proceed** as a useful signal, not proof.
+- Read the evidence for **Caution** findings.
+- Do not bypass **Block** unless you understand the behavior.
+- Report vulnerabilities privately through [SECURITY.md](./SECURITY.md).
+- Report noisy findings with the [false-positive template](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/issues/new?template=false-positive.yml).
+
+## Contributing
+
+Contributions that improve detection quality, evidence, compatibility, or false-positive handling are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 

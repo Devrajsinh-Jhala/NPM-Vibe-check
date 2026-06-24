@@ -14,7 +14,7 @@ export function parsePackageSpec(input) {
   }
 
   if (UNSUPPORTED_SPEC_PREFIXES.some((pattern) => pattern.test(raw)) || raw.endsWith(".tgz")) {
-    throw new Error("Only npm registry package names are supported in this MVP.");
+    throw new Error("Only npm registry package names are supported.");
   }
 
   let name;

@@ -28,7 +28,7 @@ const REVIEW_SCHEMA = {
 };
 
 export async function maybeRunAiReview(snapshot, analysis, tarballInspection, config = {}) {
-  const mode = config.aiMode ?? "auto";
+  const mode = config.aiMode ?? "off";
   if (!analysis.needsAi) {
     return {
       status: "skipped",
@@ -38,8 +38,8 @@ export async function maybeRunAiReview(snapshot, analysis, tarballInspection, co
 
   if (mode === "off") {
     return {
-      status: "unavailable",
-      reason: "AI mode is off.",
+      status: "skipped",
+      reason: "Heuristic-only mode; AI was not requested.",
     };
   }
 

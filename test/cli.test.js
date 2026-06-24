@@ -1,6 +1,36 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { findBinCommand, parseArgs } from "../src/cli.js";
+import { maybeRunAiReview } from "../src/ai.js";
+
+test("parseArgs defaults to heuristic-only even when provider keys exist", () => {
+  const args = parseArgs(["--check", "esbuild"], {
+    GEMINI_API_KEY: "expired-key-that-must-not-be-used",
+  });
+  assert.equal(args.aiMode, "off");
+});
+
+test("--api-key is an explicit shortcut for online AI", () => {
+  const args = parseArgs(["--api-key", "AIza-demo", "--check", "esbuild"], {});
+  assert.equal(args.aiMode, "online");
+  assert.equal(args.apiKey, "AIza-demo");
+});
+
+test("explicit --ai off wins over --api-key", () => {
+  const args = parseArgs(["--ai", "off", "--api-key", "AIza-demo", "--check", "esbuild"], {});
+  assert.equal(args.aiMode, "off");
+});
+
+test("the dedicated NPX_VIBE_API_KEY opts into online AI", () => {
+  const args = parseArgs(["--check", "esbuild"], { NPX_VIBE_API_KEY: "AIza-demo" });
+  assert.equal(args.aiMode, "online");
+});
+
+test("heuristic-only mode skips AI without reporting it unavailable", async () => {
+  const review = await maybeRunAiReview({}, { needsAi: true }, {});
+  assert.equal(review.status, "skipped");
+  assert.match(review.reason, /not requested/i);
+});
 
 test("parseArgs supports no-hassle online and package args", () => {
   const args = parseArgs(["--ai", "online", "--model=gpt-test", "cowsay", "--", "hello"], {});

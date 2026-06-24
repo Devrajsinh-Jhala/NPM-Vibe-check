@@ -1,0 +1,41 @@
+name: False positive
+about: Report a finding that appears noisy or misleading
+labels: [false-positive]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve signal quality. Do not include API keys, npm tokens, or private source code.
+  - type: input
+    id: package
+    attributes:
+      label: Package and version
+      placeholder: esbuild@0.28.1
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: npx npx-vibe --check esbuild@0.28.1
+    validations:
+      required: true
+  - type: input
+    id: finding
+    attributes:
+      label: Finding code
+      placeholder: network_and_shell
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Redacted output
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: reasoning
+    attributes:
+      label: Why does this appear to be a false positive?
+    validations:
+      required: true

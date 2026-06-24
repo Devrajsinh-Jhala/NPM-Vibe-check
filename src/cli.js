@@ -114,8 +114,10 @@ export async function reviewPackage(packageSpecInput, config) {
 }
 
 export function parseArgs(argv, env = process.env) {
+  const aiModeExplicit = Boolean(env.NPX_VIBE_AI);
   const config = {
-    aiMode: env.NPX_VIBE_AI ?? "auto",
+    aiMode: env.NPX_VIBE_AI ?? (env.NPX_VIBE_API_KEY ? "online" : "off"),
+    aiModeExplicit,
     apiKey: env.NPX_VIBE_API_KEY,
     apiUrl: env.NPX_VIBE_API_URL,
     provider: env.NPX_VIBE_PROVIDER ?? env.NPX_VIBE_AI_PROVIDER ?? "auto",
@@ -207,6 +209,7 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--ai":
           config.aiMode = readValue();
+          config.aiModeExplicit = true;
           break;
         case "--provider":
           config.provider = readValue();
@@ -216,6 +219,9 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--api-key":
           config.apiKey = readValue();
+          if (!config.aiModeExplicit) {
+            config.aiMode = "online";
+          }
           break;
         case "--api-url":
           config.apiUrl = readValue();
@@ -423,7 +429,8 @@ Usage:
 Examples:
   npx-vibe cowsay -- hello
   npx-vibe --check obscure-package
-  npx-vibe --json --ai off obscure-package
+  npx-vibe --json obscure-package
+  npx-vibe --api-key AIza... obscure-package
   OPENAI_API_KEY=... npx-vibe --ai online obscure-package
   ANTHROPIC_API_KEY=... npx-vibe --ai online obscure-package
   npx-vibe --ai online --provider gemini --api-key AIza... obscure-package
@@ -435,11 +442,11 @@ Options:
   --json                     Print JSON result; implies --check
   --yes, -y                  Execute Caution verdicts without prompting
   --force                    Execute even when verdict is Block
-  --ai auto|off|online|ollama
+  --ai off|auto|online|ollama  Default: off (heuristic-only)
   --provider auto|openai|anthropic|gemini|openrouter|groq|together|custom
   --model <name>             Online model name
   --api-url <url>            OpenAI-compatible chat completions endpoint
-  --api-key <key>            API key for online mode
+  --api-key <key>            API key; also enables online mode
   --ollama-url <url>         Default: http://127.0.0.1:11434
   --ollama-model <name>      Default: qwen2.5-coder
   --registry <url>           Default: https://registry.npmjs.org
@@ -452,13 +459,13 @@ Options:
   --help, -h
   --version, -v
 
-Auto-detected keys:
+Auto-detected keys (only after --ai online/auto opt-in):
   OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY,
   OPENROUTER_API_KEY, GROQ_API_KEY, TOGETHER_API_KEY, NPX_VIBE_API_KEY
 
 Dashboard details:
   Shows npm updated date, version publish date, license, maintainers,
-  repository, GitHub stars, last push, and latest commit when available.
+  repository activity, registry trust context, and matched source evidence.
 
 Privacy:
   Online AI review sends only selected package metadata/files from the npm tarball.

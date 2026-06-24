@@ -25,6 +25,7 @@ export function renderDashboard(result, options = {}) {
   lines.push(`Downloads: ${formatDownloads(result.stats.weeklyDownloads)}/week  Package age: ${formatDays(result.stats.packageAgeDays)}  Version age: ${formatDays(result.stats.versionAgeDays)}`);
   lines.push(`Install hooks: ${result.stats.lifecycleScripts.length ? result.stats.lifecycleScripts.map((script) => script.name).join(", ") : "none"}`);
   lines.push(`Inspected: ${result.stats.selectedFileCount} selected files from ${result.stats.fileCount} package files`);
+  lines.push(...trustContextLines(result.stats.trustContext, color));
 
   if (result.ai.status === "ok") {
     lines.push(`AI review: ${result.ai.providerLabel ?? result.ai.provider} ${result.ai.model} (${result.ai.confidence} confidence)`);
@@ -42,6 +43,10 @@ export function renderDashboard(result, options = {}) {
       const marker = colorSeverity(finding.severity, color)(finding.severity.toUpperCase().padEnd(8));
       lines.push(`- ${marker} ${finding.code}${finding.file ? ` in ${finding.file}` : ""}`);
       lines.push(`  ${finding.detail}`);
+      for (const evidence of (finding.evidence ?? []).slice(0, 2)) {
+        const location = evidence.line ? ` line ${evidence.line}` : "";
+        lines.push(color.dim(`  Evidence${location}: ${trim(evidence.excerpt, 180)}`));
+      }
     }
     if (result.findings.length > findings.length) {
       lines.push(`- … ${result.findings.length - findings.length} more finding(s) omitted`);
@@ -90,6 +95,17 @@ function profileLines(result) {
   }
 
   return lines;
+}
+
+function trustContextLines(trustContext, color) {
+  if (!trustContext?.signals?.length) {
+    return [];
+  }
+  const label = trustContext.level === "established-signals" ? "Established signals" : "Registry context";
+  return [
+    `${label}: ${trustContext.signals.join(", ")}`,
+    color.dim(trustContext.note),
+  ];
 }
 
 function actionLine(result, color) {

@@ -37,9 +37,9 @@ const NETWORK_PATTERNS = [
 ];
 
 const SHELL_PATTERNS = [
-  /child_process/,
   /\bexec(File|Sync)?\s*\(/,
   /\bspawn(Sync)?\s*\(/,
+  /child_process/,
   /\bbash\b/i,
   /\bsh\s+-c\b/i,
   /\bpowershell\b/i,
@@ -122,6 +122,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
       code: "lifecycle_hook",
       file: "package.json",
       detail: `${script.name} runs: ${script.command}`,
+      evidence: [{ line: null, excerpt: `${script.name}: ${script.command}` }],
     });
     findings.push(...analyzeText(script.command, `package.json#scripts.${script.name}`, { isLifecycleCommand: true }));
   }
@@ -129,13 +130,17 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
   findings.push(...dependencyProtocolFindings(manifest));
 
   for (const file of tarballInspection.selectedFiles ?? []) {
-    findings.push(...analyzeText(file.text, file.path, { isLifecycleCommand: false }));
+    findings.push(...analyzeText(file.text, file.path, {
+      isLifecycleCommand: false,
+      reviewReasons: file.reasons ?? [],
+    }));
     if (/(package-lock\.json|npm-shrinkwrap\.json)$/i.test(file.path) && /"hasInstallScript"\s*:\s*true/.test(file.text)) {
       findings.push({
         severity: "medium",
         code: "transitive_install_script",
         file: file.path,
         detail: "Lockfile references at least one dependency with an install script. Transitive package code was not fully reviewed.",
+        evidence: evidenceForPatterns(file.text, [/"hasInstallScript"\s*:\s*true/]),
       });
     }
   }
@@ -153,6 +158,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
       selectedFileCount: tarballInspection.selectedFiles?.length ?? 0,
       fileCount: tarballInspection.fileCount,
       totalUnpackedBytes: tarballInspection.totalUnpackedBytes,
+      trustContext: buildTrustContext(snapshot, packageAgeDays, weeklyDownloads),
     },
     findings: dedupeFindings(findings),
     staticScore,
@@ -221,14 +227,23 @@ export function addAiUnavailableFinding(analysis, reason) {
 function analyzeText(text, file, context) {
   const findings = [];
   const source = String(text ?? "");
+  const secretEvidence = evidenceForPatterns(source, [...SECRET_PATTERNS, ...ENV_ENUMERATION_PATTERNS]);
+  const networkEvidence = evidenceForPatterns(source, NETWORK_PATTERNS);
+  const shellEvidence = evidenceForPatterns(source, SHELL_PATTERNS);
+  const obfuscationEvidence = evidenceForPatterns(source, OBFUSCATION_PATTERNS);
+  const outsideWriteEvidence = evidenceForPatterns(source, OUTSIDE_WRITE_PATTERNS);
+  const downloadEvidence = evidenceForPatterns(source, [/\b(curl|wget|Invoke-WebRequest|iwr)\b/i]);
+  const pipeEvidence = evidenceForPatterns(source, [/\b(curl|wget)\b[\s\S]{0,160}\|\s*(?:sh|bash|node|python|perl|ruby)/i]);
 
-  const hasSecretAccess = SECRET_PATTERNS.some((pattern) => pattern.test(source)) || ENV_ENUMERATION_PATTERNS.some((pattern) => pattern.test(source));
-  const hasNetwork = NETWORK_PATTERNS.some((pattern) => pattern.test(source));
-  const hasShell = SHELL_PATTERNS.some((pattern) => pattern.test(source));
-  const hasObfuscation = OBFUSCATION_PATTERNS.some((pattern) => pattern.test(source));
-  const hasOutsideWrite = OUTSIDE_WRITE_PATTERNS.some((pattern) => pattern.test(source));
-  const hasDownloadCommand = /\b(curl|wget|Invoke-WebRequest|iwr)\b/i.test(source);
-  const pipesToShell = /\b(curl|wget)\b[\s\S]{0,160}\|\s*(?:sh|bash|node|python|perl|ruby)/i.test(source);
+  const hasSecretAccess = secretEvidence.length > 0;
+  const hasNetwork = networkEvidence.length > 0;
+  const hasShell = shellEvidence.length > 0;
+  const hasObfuscation = obfuscationEvidence.length > 0;
+  const hasOutsideWrite = outsideWriteEvidence.length > 0;
+  const hasDownloadCommand = downloadEvidence.length > 0;
+  const pipesToShell = pipeEvidence.length > 0;
+  const installRelatedFile = (context.reviewReasons ?? []).some((reason) => /(?:pre|post)?install|setup|prepare|suspicious/i.test(reason));
+  const networkAndShellAreRelated = installRelatedFile || patternGroupsAreNear(source, NETWORK_PATTERNS, SHELL_PATTERNS, 800);
 
   if (hasSecretAccess && hasNetwork) {
     findings.push({
@@ -236,6 +251,7 @@ function analyzeText(text, file, context) {
       code: "possible_secret_exfiltration",
       file,
       detail: "Code appears to access environment/secrets and perform network activity.",
+      evidence: mergeEvidence(secretEvidence, networkEvidence),
     });
   }
 
@@ -245,6 +261,7 @@ function analyzeText(text, file, context) {
       code: "download_and_execute",
       file,
       detail: "Command appears to download external content and execute it.",
+      evidence: pipesToShell ? pipeEvidence : mergeEvidence(downloadEvidence, shellEvidence),
     });
   }
 
@@ -254,6 +271,7 @@ function analyzeText(text, file, context) {
       code: "network_in_install_hook",
       file,
       detail: "Install lifecycle command performs network activity.",
+      evidence: networkEvidence,
     });
   }
 
@@ -263,6 +281,7 @@ function analyzeText(text, file, context) {
       code: "shell_in_install_hook",
       file,
       detail: "Install lifecycle command spawns a shell or child process.",
+      evidence: shellEvidence,
     });
   }
 
@@ -272,6 +291,7 @@ function analyzeText(text, file, context) {
       code: "obfuscated_code",
       file,
       detail: "Code contains eval/dynamic execution, base64-like payloads, or other obfuscation signals.",
+      evidence: obfuscationEvidence,
     });
   }
 
@@ -281,24 +301,28 @@ function analyzeText(text, file, context) {
       code: "suspicious_home_write",
       file,
       detail: "Code appears to write to user home, shell profile, npm credentials, or SSH files.",
+      evidence: outsideWriteEvidence,
     });
   }
 
-  if (!context.isLifecycleCommand && hasShell && hasNetwork) {
+  if (!context.isLifecycleCommand && hasShell && hasNetwork && networkAndShellAreRelated) {
     findings.push({
       severity: "medium",
       code: "network_and_shell",
       file,
       detail: "Code combines network access with shell execution.",
+      evidence: mergeEvidence(networkEvidence, shellEvidence),
     });
   }
 
-  if (/crypto(?:miner|night)|xmrig|stratum\+tcp/i.test(source)) {
+  const minerEvidence = evidenceForPatterns(source, [/crypto(?:miner|night)|xmrig|stratum\+tcp/i]);
+  if (minerEvidence.length) {
     findings.push({
       severity: "critical",
       code: "possible_cryptominer",
       file,
       detail: "Code contains cryptomining indicators.",
+      evidence: minerEvidence,
     });
   }
 
@@ -319,6 +343,7 @@ function dependencyProtocolFindings(manifest) {
           code: "unusual_dependency_protocol",
           file: "package.json",
           detail: `${field}.${name} uses ${range}.`,
+          evidence: [{ line: null, excerpt: `${field}.${name}: ${range}` }],
         });
       }
     }
@@ -332,6 +357,86 @@ function lifecycleScriptEntries(manifest) {
     const command = scripts[name];
     return typeof command === "string" && command.trim() ? [{ name, command }] : [];
   });
+}
+
+function buildTrustContext(snapshot, packageAgeDays, weeklyDownloads) {
+  const signals = [];
+  if (packageAgeDays !== null && packageAgeDays >= 365) {
+    signals.push("long registry history");
+  }
+  if (weeklyDownloads !== null && weeklyDownloads >= 100_000) {
+    signals.push("high weekly adoption");
+  }
+  if ((snapshot.profile?.maintainersCount ?? 0) >= 2) {
+    signals.push("multiple maintainers");
+  }
+  if (snapshot.profile?.repository?.github) {
+    signals.push("linked GitHub repository");
+  }
+
+  return {
+    level: signals.length >= 2 ? "established-signals" : "limited-signals",
+    signals,
+    note: "Registry popularity and age provide context, but never override code findings.",
+  };
+}
+
+function evidenceForPatterns(source, patterns) {
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(source);
+    if (match) {
+      return [evidenceAt(source, match.index, match[0])];
+    }
+  }
+  return [];
+}
+
+function evidenceAt(source, index, matchedText) {
+  const line = source.slice(0, index).split("\n").length;
+  const start = Math.max(0, index - 30);
+  const end = Math.min(source.length, index + Math.max(matchedText.length, 1) + 110);
+  const excerpt = source
+    .slice(start, end)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
+  return { line, excerpt };
+}
+
+function patternGroupsAreNear(source, firstPatterns, secondPatterns, maxDistance) {
+  const firstIndexes = patternIndexes(source, firstPatterns);
+  const secondIndexes = patternIndexes(source, secondPatterns);
+  return firstIndexes.some((first) => secondIndexes.some((second) => Math.abs(first - second) <= maxDistance));
+}
+
+function patternIndexes(source, patterns) {
+  const indexes = [];
+  for (const pattern of patterns) {
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    const matcher = new RegExp(pattern.source, flags);
+    let match;
+    while ((match = matcher.exec(source)) !== null && indexes.length < 40) {
+      indexes.push(match.index);
+      if (match[0].length === 0) {
+        matcher.lastIndex += 1;
+      }
+    }
+  }
+  return indexes;
+}
+
+function mergeEvidence(...groups) {
+  const seen = new Set();
+  const merged = [];
+  for (const evidence of groups.flat()) {
+    const key = `${evidence.line}:${evidence.excerpt}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(evidence);
+    }
+  }
+  return merged.slice(0, 2);
 }
 
 function daysSince(value) {
