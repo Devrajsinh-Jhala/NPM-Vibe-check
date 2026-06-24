@@ -2,6 +2,19 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 1.0.1 - 2026-06-24
+
+### Added
+
+- Live weekly npm download counter and seven-day trend chart sourced from npm's public API.
+- Custom SVG favicon and improved momentum visuals on the landing page.
+
+### Changed
+
+- Terminal demos now mirror current real scans for `is-number` and `esbuild`.
+- The Block demo is explicitly identified as a synthetic malicious test fixture.
+- README now links to live adoption data and includes weekly and total download badges.
+
 ## 1.0.0 - 2026-06-24
 
 ### Added

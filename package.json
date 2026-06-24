@@ -1,6 +1,6 @@
 {
   "name": "npx-vibe",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Evidence-first safety checks for npm packages before npx executes them.",
   "type": "module",
   "homepage": "https://devrajsinh-jhala.github.io/NPM-Vibe-check/",

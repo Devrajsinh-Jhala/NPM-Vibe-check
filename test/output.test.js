@@ -33,3 +33,24 @@ test("dashboard renders trust context and line-level evidence", () => {
   assert.match(dashboard, /Established signals: long registry history, high weekly adoption/);
   assert.match(dashboard, /Evidence line 42: fetch\(url\); child_process\.execFile/);
 });
+
+test("dashboard uses singular file labels", () => {
+  const dashboard = renderDashboard({
+    package: { name: "demo", version: "1.0.0" },
+    profile: { npm: {}, maintainers: [], maintainersCount: 0 },
+    verdict: { verdict: "proceed", score: 0 },
+    stats: {
+      weeklyDownloads: 10,
+      packageAgeDays: 30,
+      versionAgeDays: 30,
+      lifecycleScripts: [],
+      selectedFileCount: 1,
+      fileCount: 1,
+      trustContext: { signals: [] },
+    },
+    findings: [],
+    ai: { status: "skipped", reason: "No heuristic trigger required model review." },
+  }, { color: false });
+
+  assert.match(dashboard, /Inspected: 1 selected file from 1 package file/);
+});

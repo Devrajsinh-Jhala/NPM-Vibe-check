@@ -24,7 +24,10 @@ export function renderDashboard(result, options = {}) {
   lines.push(...profileLines(result));
   lines.push(`Downloads: ${formatDownloads(result.stats.weeklyDownloads)}/week  Package age: ${formatDays(result.stats.packageAgeDays)}  Version age: ${formatDays(result.stats.versionAgeDays)}`);
   lines.push(`Install hooks: ${result.stats.lifecycleScripts.length ? result.stats.lifecycleScripts.map((script) => script.name).join(", ") : "none"}`);
-  lines.push(`Inspected: ${result.stats.selectedFileCount} selected files from ${result.stats.fileCount} package files`);
+  lines.push(
+    `Inspected: ${result.stats.selectedFileCount} selected ${pluralize("file", result.stats.selectedFileCount)} ` +
+      `from ${result.stats.fileCount} package ${pluralize("file", result.stats.fileCount)}`
+  );
   lines.push(...trustContextLines(result.stats.trustContext, color));
 
   if (result.ai.status === "ok") {
@@ -130,6 +133,10 @@ function colorSeverity(severity, color) {
 
 function formatDownloads(value) {
   return typeof value === "number" ? value.toLocaleString("en-US") : "unknown";
+}
+
+function pluralize(word, count) {
+  return Number(count) === 1 ? word : `${word}s`;
 }
 
 function formatMaintainers(profile) {

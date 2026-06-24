@@ -9,6 +9,8 @@
     <meta property="og:description" content="Inspect npm metadata, install hooks, tarballs, source evidence, and repository context before package execution." />
     <meta property="og:type" content="website" />
     <meta name="theme-color" content="#0c0f17" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://api.npmjs.org" crossorigin />
     <link rel="stylesheet" href="./styles.css" />
     <script src="./app.js" defer></script>
   </head>
@@ -25,6 +27,7 @@
           <span>npx-vibe</span>
         </a>
         <div class="links" aria-label="Primary navigation">
+          <a href="#momentum">Downloads</a>
           <a href="#demo">Demo</a>
           <a href="#install">Install</a>
           <a href="#features">Checks</a>
@@ -39,11 +42,11 @@
 
       <section id="top" class="hero-grid">
         <div class="hero-copy reveal">
-          <p class="eyebrow">Version 1.0 trust release</p>
+          <p class="eyebrow">Version 1.0 · growing in public</p>
           <a class="release-badge" href="https://www.npmjs.com/package/npx-vibe" aria-label="View npx-vibe on npm">
             <span class="pulse-dot"></span>
-            <strong>Evidence-first package checks</strong>
-            <span>View on npm →</span>
+            <strong><span data-weekly-downloads>235</span> npm downloads this week</strong>
+            <span>Live from npm →</span>
           </a>
           <h1>Know what runs before it runs.</h1>
           <p class="lede">
@@ -63,10 +66,10 @@
         </div>
 
         <div class="hero-visual reveal" aria-label="Animated package scan preview">
-          <div class="scan-card npm-card float-a">
-            <span class="mini-label">registry context</span>
-            <strong>8 years · 241M/week</strong>
-            <small>context, never an exemption</small>
+          <div class="scan-card npm-card live-scan-card float-a">
+            <span class="mini-label live-label"><span class="live-dot"></span>npm downloads</span>
+            <strong><span data-weekly-downloads>235</span> this week</strong>
+            <small data-download-window>Official npm download API</small>
           </div>
           <div class="scan-card hook-card float-b">
             <span class="mini-label warn">matched evidence</span>
@@ -106,13 +109,62 @@ Action: review before execution.</code></pre>
         <span>0 runtime deps</span>
       </section>
 
+      <section id="momentum" class="section momentum-panel reveal" aria-labelledby="momentum-title">
+        <div class="momentum-copy">
+          <p class="eyebrow">real adoption, updated live</p>
+          <h2 id="momentum-title">People are already giving it a shot.</h2>
+          <p>
+            These figures come directly from npm's public download API. No vanity counter,
+            no analytics pixel, and no backend in the middle.
+          </p>
+          <a class="source-link" href="https://api.npmjs.org/downloads/range/last-week/npx-vibe">
+            View the npm API source →
+          </a>
+        </div>
+        <div class="download-dashboard" data-download-dashboard>
+          <div class="download-stat">
+            <span class="live-label"><span class="live-dot"></span>live weekly downloads</span>
+            <strong data-weekly-downloads aria-live="polite">235</strong>
+            <small data-download-window>June 17–23, 2026</small>
+          </div>
+          <div class="trend-card">
+            <div class="trend-heading">
+              <span>7-day trend</span>
+              <span data-download-status>Syncing with npm…</span>
+            </div>
+            <svg class="download-chart" viewBox="0 0 560 190" role="img" aria-label="Daily npm download trend">
+              <defs>
+                <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#22d3ee" stop-opacity=".42" />
+                  <stop offset="1" stop-color="#8b5cf6" stop-opacity="0" />
+                </linearGradient>
+                <linearGradient id="chart-line" x1="0" y1="0" x2="1" y2="0">
+                  <stop stop-color="#22d3ee" />
+                  <stop offset=".55" stop-color="#8b5cf6" />
+                  <stop offset="1" stop-color="#f0abfc" />
+                </linearGradient>
+              </defs>
+              <g class="chart-grid" aria-hidden="true">
+                <line x1="20" y1="35" x2="540" y2="35" />
+                <line x1="20" y1="95" x2="540" y2="95" />
+                <line x1="20" y1="155" x2="540" y2="155" />
+              </g>
+              <path data-chart-area class="chart-area" d="M20 155 L540 155 L540 155 L20 155 Z" />
+              <polyline data-chart-line class="chart-line" points="20,155 107,155 193,155 280,155 367,155 453,155 540,35" />
+              <g data-chart-points class="chart-points"></g>
+            </svg>
+            <div class="chart-labels" data-chart-labels aria-hidden="true"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="section release-panel reveal">
         <div>
-          <p class="eyebrow">1.0 is about trust</p>
+          <p class="eyebrow">shipping fast, fixing faster</p>
           <h2>Clear evidence. Narrow boundaries. Predictable defaults.</h2>
           <p>
-            The 1.0 release adds source excerpts, registry trust context, cross-platform CI,
-            publish-time verification, security reporting, and a dedicated false-positive workflow.
+            The current release is heuristic-only by default, includes line-level evidence, and is tested
+            across nine OS and Node combinations. Early users helped us harden it quickly.
           </p>
         </div>
         <div class="release-actions">
@@ -125,13 +177,13 @@ Action: review before execution.</code></pre>
         <div class="section-heading">
           <p class="eyebrow">interactive terminal</p>
           <h2>Three outcomes, with reasons you can inspect.</h2>
-          <p>Switch between a quiet package, an install-time review, and critical exfiltration behavior.</p>
+          <p>The Proceed and Caution tabs mirror current 1.0.x scans. Block uses the malicious fixture from the test suite—clearly labeled, never passed off as a real package.</p>
         </div>
         <div class="demo-grid">
           <div class="demo-controls" role="tablist" aria-label="Demo scenarios">
-            <button class="demo-tab active" type="button" data-demo="proceed"><span class="status-dot good"></span>Stable package<small>Proceed</small></button>
-            <button class="demo-tab" type="button" data-demo="caution"><span class="status-dot warn"></span>Install hook<small>Caution</small></button>
-            <button class="demo-tab" type="button" data-demo="block"><span class="status-dot bad"></span>Secret exfiltration<small>Block</small></button>
+            <button class="demo-tab active" type="button" data-demo="proceed"><span class="status-dot good"></span>Real: is-number<small>Proceed</small></button>
+            <button class="demo-tab" type="button" data-demo="caution"><span class="status-dot warn"></span>Real: esbuild<small>Caution</small></button>
+            <button class="demo-tab" type="button" data-demo="block"><span class="status-dot bad"></span>Synthetic fixture<small>Block</small></button>
           </div>
           <div class="terminal demo-terminal" aria-live="polite">
             <div class="terminal-bar"><span></span><span></span><span></span></div>

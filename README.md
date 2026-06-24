@@ -1,7 +1,8 @@
 # npx-vibe
 
 [![npm version](https://img.shields.io/npm/v/npx-vibe.svg?color=22d3ee)](https://www.npmjs.com/package/npx-vibe)
-[![npm downloads](https://img.shields.io/npm/dw/npx-vibe.svg?color=34d399)](https://www.npmjs.com/package/npx-vibe)
+[![npm weekly downloads](https://img.shields.io/npm/dw/npx-vibe.svg?color=34d399)](https://www.npmjs.com/package/npx-vibe)
+[![npm total downloads](https://img.shields.io/npm/dt/npx-vibe.svg?color=a78bfa)](https://www.npmjs.com/package/npx-vibe)
 [![CI](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/node/v/npx-vibe.svg)](https://www.npmjs.com/package/npx-vibe)
 [![License: MIT](https://img.shields.io/npm/l/npx-vibe.svg)](./LICENSE)
@@ -17,6 +18,15 @@ The default scan is deterministic, local, and requires no account or API key. AI
 - [GitHub repository](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check)
 - [Security policy](./SECURITY.md)
 - [Changelog](./CHANGELOG.md)
+
+## Live adoption
+
+The [project website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/#momentum) displays the current seven-day download total and daily trend directly from npm's public download API:
+
+- [weekly total](https://api.npmjs.org/downloads/point/last-week/npx-vibe)
+- [daily seven-day range](https://api.npmjs.org/downloads/range/last-week/npx-vibe)
+
+The counter is live rather than hard-coded, and the site links to the source data. npm download counts are adoption signals—not proof of package safety or quality—but they help show that real developers are trying the tool.
 
 ## Quick start
 
@@ -56,7 +66,7 @@ By default, execution uses npm with install scripts ignored. Use `--allow-instal
 
 ## Evidence, not mystery scores
 
-Every deterministic source finding includes the matched line and a bounded excerpt. Registry popularity is displayed separately as context and never overrides suspicious code.
+Every deterministic source finding includes the matched line and a bounded excerpt. Registry popularity is displayed separately as context and never overrides suspicious code. The example below mirrors a real `npx-vibe 1.0.0` scan; registry dates and download counts naturally change over time.
 
 ```text
 $ npx npx-vibe --check esbuild
@@ -199,7 +209,7 @@ Use JSON plus exit codes in CI or local automation:
 npx npx-vibe --json <package> > npx-vibe-report.json
 ```
 
-The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. npm publishing automatically runs syntax checks and the complete test suite through `prepublishOnly`.
+The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. npm publishing automatically runs syntax checks and the complete test suite through `prepublishOnly`. The interactive website demo labels real scans and synthetic malicious fixtures separately.
 
 ## Configuration
 

