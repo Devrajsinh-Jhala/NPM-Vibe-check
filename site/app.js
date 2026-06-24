@@ -37,6 +37,26 @@ Findings:
   Evidence line 187: child_process.execSync(\`npm install ...\`)
 
 Action: review recommended before execution.`,
+  ai: `$ npx npx-vibe --check --ai online \\
+  --provider gemini --model-profile balanced esbuild
+! npx-vibe: Caution  risk 43/100
+esbuild@0.28.1
+
+Install hooks: postinstall
+Inspected: 3 selected files from 7 package files
+AI review: Gemini gemini-3.5-flash [balanced] (high confidence)
+
+Findings:
+- MEDIUM   lifecycle_hook in package.json
+  postinstall runs: node install.js
+- MEDIUM   network_and_shell in install.js
+  Code combines network access with shell execution.
+
+AI summary: The install script downloads a platform-specific binary
+and invokes package-manager tooling. No credential access,
+obfuscation, or persistence was found in the selected files.
+
+Action: review recommended before execution.`,
   block: `# Synthetic malicious fixture from the npx-vibe test suite
 ✕ npx-vibe: Block  risk 100/100
 fixture: install-time secret exfiltration
@@ -53,12 +73,35 @@ Findings:
 Action: blocked unless --force is supplied.`
 };
 
+const demoMeta = {
+  proceed: {
+    label: "deterministic · real package",
+    note: "Real heuristic-only output. No API key, model, or package execution is involved.",
+  },
+  caution: {
+    label: "deterministic · real package",
+    note: "Real heuristic-only output. Popularity is context; install-time behavior still receives Caution.",
+  },
+  ai: {
+    label: "optional AI · representative",
+    note: "Representative model response using the real deterministic esbuild findings. Exact AI wording varies by provider and model.",
+  },
+  block: {
+    label: "deterministic · synthetic fixture",
+    note: "Synthetic malicious fixture from the test suite—not a claim about a public npm package.",
+  },
+};
+
 const output = document.querySelector("#demo-output");
+const demoLabel = document.querySelector("#demo-label");
+const demoNote = document.querySelector("#demo-note");
 const tabs = document.querySelectorAll(".demo-tab");
 
 function setDemo(name) {
   if (!output || !demos[name]) return;
   output.textContent = demos[name];
+  if (demoLabel) demoLabel.textContent = demoMeta[name].label;
+  if (demoNote) demoNote.textContent = demoMeta[name].note;
   tabs.forEach((tab) => {
     const active = tab.dataset.demo === name;
     tab.classList.toggle("active", active);

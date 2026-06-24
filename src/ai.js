@@ -47,11 +47,7 @@ export async function maybeRunAiReview(snapshot, analysis, tarballInspection, co
     try {
       return await callOnline(snapshot, analysis, tarballInspection, config);
     } catch (error) {
-      return {
-        status: "unavailable",
-        provider: "online",
-        reason: error.message,
-      };
+      return onlineUnavailable(error, config);
     }
   }
 
@@ -78,11 +74,7 @@ export async function maybeRunAiReview(snapshot, analysis, tarballInspection, co
     try {
       return await callOnline(snapshot, analysis, tarballInspection, config);
     } catch (error) {
-      return {
-        status: "unavailable",
-        provider: "online",
-        reason: error.message,
-      };
+      return onlineUnavailable(error, config);
     }
   }
 
@@ -102,7 +94,7 @@ async function callOnline(snapshot, analysis, tarballInspection, config) {
   if (!provider.apiKey) {
     return {
       status: "unavailable",
-      provider: provider.name,
+      ...onlineProviderMeta(provider),
       reason: `No API key found for ${provider.label}. Set ${provider.keyHint} or pass --api-key.`,
     };
   }
@@ -114,18 +106,39 @@ async function callOnline(snapshot, analysis, tarballInspection, config) {
   if (!text) {
     return {
       status: "unavailable",
-      provider: provider.name,
-      providerLabel: provider.label,
-      model: provider.model,
+      ...onlineProviderMeta(provider),
       reason: `${provider.label} response did not include review text.`,
     };
   }
 
-  return normalizeAiReview(text, {
+  return normalizeAiReview(text, onlineProviderMeta(provider));
+}
+
+function onlineUnavailable(error, config) {
+  try {
+    return {
+      status: "unavailable",
+      ...onlineProviderMeta(resolveOnlineProvider(config)),
+      reason: error.message,
+    };
+  } catch {
+    return {
+      status: "unavailable",
+      provider: "online",
+      reason: error.message,
+    };
+  }
+}
+
+function onlineProviderMeta(provider) {
+  return {
     provider: provider.name,
     providerLabel: provider.label,
     model: provider.model,
-  });
+    modelProfile: provider.modelProfile,
+    modelSource: provider.modelSource,
+    catalogVerifiedAt: provider.catalogVerifiedAt,
+  };
 }
 async function callOllama(snapshot, analysis, tarballInspection, config) {
   const baseUrl = String(config.ollamaUrl ?? DEFAULT_OLLAMA_URL).replace(/\/+$/, "");

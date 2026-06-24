@@ -54,3 +54,33 @@ test("dashboard uses singular file labels", () => {
 
   assert.match(dashboard, /Inspected: 1 selected file from 1 package file/);
 });
+
+test("dashboard identifies the resolved AI model profile", () => {
+  const dashboard = renderDashboard({
+    package: { name: "demo", version: "1.0.0" },
+    profile: { npm: {}, maintainers: [], maintainersCount: 0 },
+    verdict: { verdict: "proceed", score: 8 },
+    stats: {
+      weeklyDownloads: 10,
+      packageAgeDays: 30,
+      versionAgeDays: 30,
+      lifecycleScripts: [],
+      selectedFileCount: 1,
+      fileCount: 1,
+      trustContext: { signals: [] },
+    },
+    findings: [],
+    ai: {
+      status: "ok",
+      provider: "gemini",
+      providerLabel: "Gemini",
+      model: "gemini-3.5-flash",
+      modelProfile: "balanced",
+      modelSource: "profile:balanced",
+      confidence: "high",
+      summary: "No suspicious behavior found.",
+    },
+  }, { color: false });
+
+  assert.match(dashboard, /Gemini gemini-3\.5-flash \[balanced\] \(high confidence\)/);
+});

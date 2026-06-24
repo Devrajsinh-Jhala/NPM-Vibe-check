@@ -31,11 +31,15 @@ export function renderDashboard(result, options = {}) {
   lines.push(...trustContextLines(result.stats.trustContext, color));
 
   if (result.ai.status === "ok") {
-    lines.push(`AI review: ${result.ai.providerLabel ?? result.ai.provider} ${result.ai.model} (${result.ai.confidence} confidence)`);
+    const profile = result.ai.modelSource?.startsWith("profile:") ? ` [${result.ai.modelProfile}]` : "";
+    lines.push(`AI review: ${result.ai.providerLabel ?? result.ai.provider} ${result.ai.model}${profile} (${result.ai.confidence} confidence)`);
   } else if (result.ai.status === "skipped") {
     lines.push(`AI review: skipped (${result.ai.reason})`);
   } else {
-    lines.push(`AI review: unavailable (${result.ai.reason})`);
+    const target = result.ai.model
+      ? `${result.ai.providerLabel ?? result.ai.provider} ${result.ai.model}: `
+      : "";
+    lines.push(`AI review: unavailable (${target}${trim(result.ai.reason, 240)})`);
   }
 
   const findings = result.findings.slice(0, 10);

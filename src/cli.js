@@ -10,6 +10,7 @@ import { analyzePackage, addAiUnavailableFinding } from "./analysis.js";
 import { maybeRunAiReview } from "./ai.js";
 import { decideVerdict, checkExitCode } from "./verdict.js";
 import { renderDashboard, toJsonResult } from "./output.js";
+import { formatProviderModelCatalog, modelProfiles } from "./providers.js";
 
 export async function main(argv = process.argv.slice(2)) {
   try {
@@ -31,6 +32,11 @@ export async function run(argv, env = process.env) {
 
   if (config.version) {
     console.log(packageVersion());
+    return 0;
+  }
+
+  if (config.models) {
+    console.log(formatProviderModelCatalog());
     return 0;
   }
 
@@ -122,6 +128,7 @@ export function parseArgs(argv, env = process.env) {
     apiUrl: env.NPX_VIBE_API_URL,
     provider: env.NPX_VIBE_PROVIDER ?? env.NPX_VIBE_AI_PROVIDER ?? "auto",
     model: env.NPX_VIBE_MODEL,
+    modelProfile: env.NPX_VIBE_MODEL_PROFILE ?? "balanced",
     appUrl: env.NPX_VIBE_APP_URL,
     aiMaxTokens: numberFromEnv(env.NPX_VIBE_AI_MAX_TOKENS, 1_500),
     apiKeys: {
@@ -147,6 +154,7 @@ export function parseArgs(argv, env = process.env) {
     npmBin: env.NPX_VIBE_NPM_BIN,
     check: false,
     json: false,
+    models: false,
     yes: false,
     force: false,
     allowInstallScripts: false,
@@ -194,6 +202,9 @@ export function parseArgs(argv, env = process.env) {
           config.json = true;
           config.check = true;
           break;
+        case "--models":
+          config.models = true;
+          break;
         case "--yes":
         case "-y":
           config.yes = true;
@@ -216,6 +227,9 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--model":
           config.model = readValue();
+          break;
+        case "--model-profile":
+          config.modelProfile = readValue().toLowerCase();
           break;
         case "--api-key":
           config.apiKey = readValue();
@@ -270,12 +284,16 @@ export function parseArgs(argv, env = process.env) {
     }
   }
 
-  if (!config.help && !config.version && !config.packageSpec) {
+  if (!config.help && !config.version && !config.models && !config.packageSpec) {
     throw new Error("Missing package spec. Try --help.");
   }
 
   if (!["auto", "off", "online", "ollama"].includes(config.aiMode)) {
     throw new Error("--ai must be one of: auto, off, online, ollama.");
+  }
+
+  if (!modelProfiles().includes(config.modelProfile)) {
+    throw new Error("--model-profile must be one of: fast, balanced, strong.");
   }
 
   return config;
@@ -378,6 +396,9 @@ function sanitizeAiReview(aiReview) {
     provider: aiReview.provider,
     providerLabel: aiReview.providerLabel,
     model: aiReview.model,
+    modelProfile: aiReview.modelProfile,
+    modelSource: aiReview.modelSource,
+    catalogVerifiedAt: aiReview.catalogVerifiedAt,
     reason: aiReview.reason,
     riskScore: aiReview.riskScore,
     confidence: aiReview.confidence,
@@ -430,21 +451,24 @@ Examples:
   npx-vibe cowsay -- hello
   npx-vibe --check obscure-package
   npx-vibe --json obscure-package
+  npx-vibe --models
   npx-vibe --api-key AIza... obscure-package
   OPENAI_API_KEY=... npx-vibe --ai online obscure-package
   ANTHROPIC_API_KEY=... npx-vibe --ai online obscure-package
-  npx-vibe --ai online --provider gemini --api-key AIza... obscure-package
-  npx-vibe --ai online --provider custom --api-url https://models.example/v1/chat/completions --api-key ... obscure-package
+  npx-vibe --ai online --provider gemini --model-profile strong --api-key AIza... obscure-package
+  npx-vibe --ai online --provider custom --api-url https://models.example/v1/chat/completions --model my-model --api-key ... obscure-package
   npx-vibe --ai ollama --ollama-model qwen2.5-coder obscure-package
 
 Options:
   --check                    Review only; do not execute
   --json                     Print JSON result; implies --check
+  --models                   Show bundled provider model recommendations
   --yes, -y                  Execute Caution verdicts without prompting
   --force                    Execute even when verdict is Block
   --ai off|auto|online|ollama  Default: off (heuristic-only)
   --provider auto|openai|anthropic|gemini|openrouter|groq|together|custom
-  --model <name>             Online model name
+  --model-profile <profile>  fast, balanced (default), or strong
+  --model <name>             Exact online model; overrides the profile
   --api-url <url>            OpenAI-compatible chat completions endpoint
   --api-key <key>            API key; also enables online mode
   --ollama-url <url>         Default: http://127.0.0.1:11434
@@ -462,6 +486,11 @@ Options:
 Auto-detected keys (only after --ai online/auto opt-in):
   OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY,
   OPENROUTER_API_KEY, GROQ_API_KEY, TOGETHER_API_KEY, NPX_VIBE_API_KEY
+
+Model selection:
+  The balanced profile chooses a current provider-specific model.
+  Use --models to inspect the bundled mapping, --model-profile for a
+  simple quality/cost choice, or --model for an exact provider model.
 
 Dashboard details:
   Shows npm updated date, version publish date, license, maintainers,

@@ -11,7 +11,7 @@
 
 `npx-vibe` resolves a package from the public npm registry, downloads and verifies its tarball without executing it, inspects install-time code, and prints a clear **Proceed**, **Caution**, or **Block** verdict.
 
-The default scan is deterministic, local, and requires no account or API key. AI review is optional and opt-in.
+The default scan is deterministic, local, and requires no account or API key. AI review is optional, opt-in, and lets you choose an exact model or a maintained `fast`, `balanced`, or `strong` profile.
 
 - [npm package](https://www.npmjs.com/package/npx-vibe)
 - [Live website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/)
@@ -92,6 +92,23 @@ Action: review recommended before execution.
 
 A popular package can still receive **Caution** when it performs sensitive install-time behavior. That is intentional: maturity is useful context, not a security exemption.
 
+When AI is explicitly enabled, the resolved provider and model are visible in the result. This representative example shows the additional review layer; model wording can vary:
+
+```text
+$ npx npx-vibe --check --ai online --provider gemini --model-profile balanced esbuild
+! npx-vibe: Caution  risk 43/100
+esbuild@0.28.1
+
+Install hooks: postinstall
+AI review: Gemini gemini-3.5-flash [balanced] (high confidence)
+
+AI summary: The install script downloads a platform-specific binary and invokes
+package-manager tooling. No credential access, obfuscation, or persistence was found
+in the selected files, but the install-time network and process behavior merits review.
+
+Action: review recommended before execution.
+```
+
 ## What it checks
 
 | Area | Signals |
@@ -149,6 +166,8 @@ Useful options:
 --force
 --ai off|auto|online|ollama
 --provider auto|openai|anthropic|gemini|openrouter|groq|together|custom
+--models
+--model-profile fast|balanced|strong
 --model <name>
 --api-key <key>
 --api-url <url>
@@ -201,6 +220,43 @@ npx npx-vibe --ai online \
 
 Online AI receives bounded package metadata, deterministic findings, install scripts, and selected files from the downloaded package tarball. It does not receive your project files, shell history, npm tokens, or environment-variable values.
 
+### Choose a model without memorizing provider catalogs
+
+The default online profile is `balanced`. It aims for a practical mix of review quality, latency, and cost. You can inspect the complete bundled mapping without configuring a key:
+
+```bash
+npx npx-vibe --models
+```
+
+Choose a simple profile:
+
+```bash
+npx npx-vibe --check --ai online --provider anthropic --model-profile fast <package>
+npx npx-vibe --check --ai online --provider openai --model-profile balanced <package>
+npx npx-vibe --check --ai online --provider gemini --model-profile strong <package>
+```
+
+Or pin any provider-supported model:
+
+```bash
+npx npx-vibe --check --ai online --provider gemini --model gemini-3.5-flash <package>
+```
+
+Bundled recommendations, verified **June 25, 2026**:
+
+| Provider | Fast | Balanced (default) | Strong |
+| --- | --- | --- | --- |
+| OpenAI | `gpt-5.4-nano` | `gpt-5.4-mini` | `gpt-5.5` |
+| Anthropic | `claude-haiku-4-5` | `claude-sonnet-4-6` | `claude-opus-4-8` |
+| Gemini | `gemini-3.1-flash-lite` | `gemini-3.5-flash` | `gemini-3.5-flash` |
+| OpenRouter | `openrouter/auto` | `openrouter/auto` | `openrouter/auto` |
+| Groq | `openai/gpt-oss-20b` | `openai/gpt-oss-120b` | `openai/gpt-oss-120b` |
+| Together AI | `Qwen/Qwen3.5-9B` | `Qwen/Qwen3.5-9B` | `deepseek-ai/DeepSeek-V4-Pro` |
+
+Official references: [OpenAI models](https://developers.openai.com/api/docs/guides/latest-model), [Anthropic models](https://platform.claude.com/docs/en/about-claude/models/overview), [Gemini models](https://ai.google.dev/gemini-api/docs/models), [OpenRouter Auto](https://openrouter.ai/docs/guides/routing/routers/auto-router), [Groq models](https://console.groq.com/docs/models), and [Together serverless models](https://docs.together.ai/docs/serverless/models).
+
+Provider catalogs change independently of `npx-vibe`. The resolved model is always printed, `--model` always wins, and `--models` shows the recommendations bundled with your installed release. Custom OpenAI-compatible endpoints require an explicit `--model`.
+
 ## Automation and CI
 
 Use JSON plus exit codes in CI or local automation:
@@ -218,7 +274,8 @@ NPX_VIBE_AI=off
 NPX_VIBE_PROVIDER=auto
 NPX_VIBE_API_KEY=...
 NPX_VIBE_API_URL=https://api.openai.com/v1/chat/completions
-NPX_VIBE_MODEL=gpt-4.1-mini
+NPX_VIBE_MODEL_PROFILE=balanced
+NPX_VIBE_MODEL=gpt-5.4-mini
 NPX_VIBE_OLLAMA_URL=http://127.0.0.1:11434
 NPX_VIBE_OLLAMA_MODEL=qwen2.5-coder
 NPX_VIBE_AGE_DAYS=14

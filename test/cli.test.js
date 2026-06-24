@@ -40,6 +40,14 @@ test("parseArgs supports no-hassle online and package args", () => {
   assert.deepEqual(args.packageArgs, ["hello"]);
 });
 
+test("parseArgs supports model profiles and model catalog without a package", () => {
+  const profileArgs = parseArgs(["--model-profile", "strong", "--check", "esbuild"], {});
+  const catalogArgs = parseArgs(["--models"], {});
+  assert.equal(profileArgs.modelProfile, "strong");
+  assert.equal(catalogArgs.models, true);
+  assert.throws(() => parseArgs(["--model-profile", "unknown", "esbuild"], {}), /fast, balanced, strong/);
+});
+
 test("findBinCommand picks obvious bin names", () => {
   assert.equal(findBinCommand({ bin: "cli.js" }, { name: "@scope/tool", unscopedName: "tool" }), "tool");
   assert.equal(findBinCommand({ bin: { tool: "cli.js", other: "other.js" } }, { name: "tool", unscopedName: "tool" }), "tool");

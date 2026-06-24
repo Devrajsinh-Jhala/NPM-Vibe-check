@@ -2,6 +2,23 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 1.1.0 - 2026-06-25
+
+### Added
+
+- `fast`, `balanced`, and `strong` model profiles for every supported online provider.
+- `--models` to inspect the bundled provider/model mapping without an API key or network request.
+- Exact model overrides through `--model`, with explicit model requirements for custom compatible endpoints.
+- AI-review examples and current model guidance in the README and landing page.
+
+### Changed
+
+- Replaced retired model defaults with provider-specific recommendations verified on June 25, 2026.
+- The default `balanced` profile now favors current, cost-conscious models suitable for package review.
+- AI output identifies the resolved provider, model, and profile.
+- Provider failures are concise and retain the attempted model context.
+- Landing-page terminal demos and responsive alignment were redesigned around heuristic and AI workflows.
+
 ## 1.0.1 - 2026-06-24
 
 ### Added
