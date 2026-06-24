@@ -8,6 +8,7 @@ All notable changes to `npx-vibe` are documented here.
 
 - Live weekly npm download counter and seven-day trend chart sourced from npm's public API.
 - Custom SVG favicon and improved momentum visuals on the landing page.
+- Graceful last-known fallback when npm's download API is slow or unavailable.
 
 ### Changed
 
