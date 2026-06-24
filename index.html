@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>npx-vibe 1.0 — evidence before npm package execution</title>
+    <title>npx-vibe 1.1 — evidence before npm package execution</title>
     <meta name="description" content="Evidence-first safety checks for npm packages before npx executes them. Heuristic-only by default, zero runtime dependencies, optional AI." />
-    <meta property="og:title" content="npx-vibe 1.0 — know what runs before it runs" />
+    <meta property="og:title" content="npx-vibe 1.1 — know what runs before it runs" />
     <meta property="og:description" content="Inspect npm metadata, install hooks, tarballs, source evidence, and repository context before package execution." />
     <meta property="og:type" content="website" />
     <meta name="theme-color" content="#0c0f17" />
@@ -42,7 +42,7 @@
 
       <section id="top" class="hero-grid">
         <div class="hero-copy reveal">
-          <p class="eyebrow">Version 1.0 · growing in public</p>
+          <p class="eyebrow">Version 1.1 · growing in public</p>
           <a class="release-badge" href="https://www.npmjs.com/package/npx-vibe" aria-label="View npx-vibe on npm">
             <span class="pulse-dot"></span>
             <strong><span data-weekly-downloads>235</span> npm downloads this week</strong>
@@ -163,8 +163,8 @@ Action: review before execution.</code></pre>
           <p class="eyebrow">shipping fast, fixing faster</p>
           <h2>Clear evidence. Narrow boundaries. Predictable defaults.</h2>
           <p>
-            The current release is heuristic-only by default, includes line-level evidence, and is tested
-            across nine OS and Node combinations. Early users helped us harden it quickly.
+            The current release is heuristic-only by default, includes line-level evidence, and replaces
+            stale AI defaults with visible fast, balanced, and strong model profiles.
           </p>
         </div>
         <div class="release-actions">
@@ -176,18 +176,22 @@ Action: review before execution.</code></pre>
       <section id="demo" class="section demo-section reveal">
         <div class="section-heading">
           <p class="eyebrow">interactive terminal</p>
-          <h2>Three outcomes, with reasons you can inspect.</h2>
-          <p>The Proceed and Caution tabs mirror current 1.0.x scans. Block uses the malicious fixture from the test suite—clearly labeled, never passed off as a real package.</p>
+          <h2>Heuristics first. AI only when you ask.</h2>
+          <p>Compare deterministic scans with the optional AI layer. Real package scans and synthetic fixtures stay clearly labeled, so the demo never blurs evidence with theatre.</p>
         </div>
         <div class="demo-grid">
           <div class="demo-controls" role="tablist" aria-label="Demo scenarios">
-            <button class="demo-tab active" type="button" data-demo="proceed"><span class="status-dot good"></span>Real: is-number<small>Proceed</small></button>
-            <button class="demo-tab" type="button" data-demo="caution"><span class="status-dot warn"></span>Real: esbuild<small>Caution</small></button>
-            <button class="demo-tab" type="button" data-demo="block"><span class="status-dot bad"></span>Synthetic fixture<small>Block</small></button>
+            <button class="demo-tab active" type="button" data-demo="proceed"><span class="status-dot good"></span><span>Heuristic · is-number</span><small>Real scan · Proceed</small></button>
+            <button class="demo-tab" type="button" data-demo="caution"><span class="status-dot warn"></span><span>Heuristic · esbuild</span><small>Real scan · Caution</small></button>
+            <button class="demo-tab" type="button" data-demo="ai"><span class="status-dot ai"></span><span>AI review · esbuild</span><small>Representative output</small></button>
+            <button class="demo-tab" type="button" data-demo="block"><span class="status-dot bad"></span><span>Malicious fixture</span><small>Synthetic · Block</small></button>
           </div>
-          <div class="terminal demo-terminal" aria-live="polite">
-            <div class="terminal-bar"><span></span><span></span><span></span></div>
-            <pre><code id="demo-output"></code></pre>
+          <div class="demo-stage">
+            <div class="terminal demo-terminal" aria-live="polite">
+              <div class="terminal-bar"><span></span><span></span><span></span><strong id="demo-label">deterministic scan</strong></div>
+              <pre><code id="demo-output"></code></pre>
+            </div>
+            <p class="demo-note" id="demo-note"></p>
           </div>
         </div>
       </section>
@@ -216,6 +220,11 @@ Action: review before execution.</code></pre>
               <button class="copy-button" type="button" data-copy="npx-vibe cowsay -- hello">Copy</button>
               <span>Review and run</span>
               <pre><code>npx-vibe cowsay -- hello</code></pre>
+            </div>
+            <div class="copy-card mini-command">
+              <button class="copy-button" type="button" data-copy="npx npx-vibe --models">Copy</button>
+              <span>See AI models</span>
+              <pre><code>npx npx-vibe --models</code></pre>
             </div>
           </div>
         </div>
@@ -263,13 +272,27 @@ Action: review before execution.</code></pre>
       </section>
 
       <section id="providers" class="section provider-panel reveal">
-        <div>
+        <div class="provider-intro">
           <p class="eyebrow">bring your own model</p>
-          <h2>No AI required. Your choice when useful.</h2>
-          <p>Stay deterministic, keep review local with Ollama, or explicitly use OpenAI, Anthropic, Gemini, OpenRouter, Groq, Together, or a compatible endpoint.</p>
+          <h2>Pick a goal, not a model spreadsheet.</h2>
+          <p>Stay deterministic, keep review local with Ollama, or choose fast, balanced, or strong. The exact resolved model is printed every time, and <code>--model</code> remains available when you want full control.</p>
+          <div class="model-command"><code>npx npx-vibe --models</code><span>See the bundled mapping</span></div>
         </div>
-        <div class="provider-cloud" aria-label="Supported AI providers">
-          <span>Heuristics only</span><span>Ollama</span><span>OpenAI</span><span>Anthropic</span><span>Gemini</span><span>OpenRouter</span><span>Groq</span><span>Together</span><span>Custom API</span>
+        <div class="profile-stack" aria-label="AI model profiles">
+          <article><span>Fast</span><strong>Lower latency and cost</strong><small>Useful for frequent package checks.</small></article>
+          <article class="recommended"><span>Balanced · default</span><strong>The everyday choice</strong><small>Strong review quality without reaching for the largest model.</small></article>
+          <article><span>Strong</span><strong>Maximum provider capability</strong><small>For the packages that deserve a deeper look.</small></article>
+        </div>
+        <div class="provider-catalog">
+          <div class="catalog-heading"><strong>Balanced defaults</strong><span>Verified June 25, 2026</span></div>
+          <div class="provider-model-grid">
+            <span><b>OpenAI</b><code>gpt-5.4-mini</code></span>
+            <span><b>Anthropic</b><code>claude-sonnet-4-6</code></span>
+            <span><b>Gemini</b><code>gemini-3.5-flash</code></span>
+            <span><b>OpenRouter</b><code>openrouter/auto</code></span>
+            <span><b>Groq</b><code>openai/gpt-oss-120b</code></span>
+            <span><b>Together</b><code>Qwen/Qwen3.5-9B</code></span>
+          </div>
         </div>
       </section>
 
