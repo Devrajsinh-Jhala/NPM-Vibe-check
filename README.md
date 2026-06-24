@@ -26,7 +26,7 @@ The [project website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/#momentu
 - [weekly total](https://api.npmjs.org/downloads/point/last-week/npx-vibe)
 - [daily seven-day range](https://api.npmjs.org/downloads/range/last-week/npx-vibe)
 
-The counter is live rather than hard-coded, and the site links to the source data. npm download counts are adoption signals—not proof of package safety or quality—but they help show that real developers are trying the tool.
+The counter is live rather than hard-coded, and the site links to the source data. npm download counts measure package fetches, not unique users. They are momentum signals—not proof of package safety or quality—but they show that the package is being discovered and installed.
 
 ## Quick start
 
