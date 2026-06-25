@@ -2,6 +2,15 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 1.1.1 - 2026-06-25
+
+### Fixed
+
+- Recognize Google's new Gemini authorization-key format when `--api-key` is used with automatic provider selection.
+- Send Gemini credentials through the current `x-goog-api-key` header instead of a URL query parameter.
+- Refuse to forward unrecognized direct API keys to a guessed provider.
+- Redact exact API keys from provider error bodies before displaying them.
+
 ## 1.1.0 - 2026-06-25
 
 ### Added

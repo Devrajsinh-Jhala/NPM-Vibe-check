@@ -452,10 +452,10 @@ Examples:
   npx-vibe --check obscure-package
   npx-vibe --json obscure-package
   npx-vibe --models
-  npx-vibe --api-key AIza... obscure-package
+  npx-vibe --provider gemini --api-key ... obscure-package
   OPENAI_API_KEY=... npx-vibe --ai online obscure-package
   ANTHROPIC_API_KEY=... npx-vibe --ai online obscure-package
-  npx-vibe --ai online --provider gemini --model-profile strong --api-key AIza... obscure-package
+  npx-vibe --ai online --provider gemini --model-profile strong --api-key ... obscure-package
   npx-vibe --ai online --provider custom --api-url https://models.example/v1/chat/completions --model my-model --api-key ... obscure-package
   npx-vibe --ai ollama --ollama-model qwen2.5-coder obscure-package
 
@@ -470,7 +470,7 @@ Options:
   --model-profile <profile>  fast, balanced (default), or strong
   --model <name>             Exact online model; overrides the profile
   --api-url <url>            OpenAI-compatible chat completions endpoint
-  --api-key <key>            API key; also enables online mode
+  --api-key <key>            API key; also enables online mode (provider recommended)
   --ollama-url <url>         Default: http://127.0.0.1:11434
   --ollama-model <name>      Default: qwen2.5-coder
   --registry <url>           Default: https://registry.npmjs.org
@@ -492,6 +492,11 @@ Model selection:
   Use --models to inspect the bundled mapping, --model-profile for a
   simple quality/cost choice, or --model for an exact provider model.
 
+Provider routing:
+  Provider-specific environment variables are preferred. Recognizable key
+  formats can be auto-detected; ambiguous keys require --provider and are
+  never forwarded to a guessed service.
+
 Dashboard details:
   Shows npm updated date, version publish date, license, maintainers,
   repository activity, registry trust context, and matched source evidence.
@@ -499,5 +504,6 @@ Dashboard details:
 Privacy:
   Online AI review sends only selected package metadata/files from the npm tarball.
   Local project files, environment variables, npm tokens, and shell history are not sent.
+  Prefer provider-specific environment variables so API keys do not enter shell history.
 `;
 }

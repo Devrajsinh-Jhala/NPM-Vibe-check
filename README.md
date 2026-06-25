@@ -188,9 +188,11 @@ Run `npx npx-vibe --help` for the complete CLI reference.
 
 Ambient keys such as `OPENAI_API_KEY` or `GEMINI_API_KEY` do **not** activate AI in the default mode.
 
+> **Important:** Do not paste long-lived API keys into screenshots, issues, chat messages, or shared terminal recordings. Revoke any exposed key immediately.
+
 ```bash
 npx npx-vibe <package>                         # heuristic-only default
-npx npx-vibe --api-key <key> <package>         # online AI shortcut
+npx npx-vibe --provider gemini --api-key <key> <package>  # direct-key shortcut
 npx npx-vibe --ai online <package>             # use an explicitly configured online provider
 npx npx-vibe --ai auto <package>               # detect configured provider or local Ollama
 npx npx-vibe --ai ollama <package>             # local Ollama
@@ -206,6 +208,26 @@ OPENROUTER_API_KEY=... npx npx-vibe --ai online <package>
 GROQ_API_KEY=... npx npx-vibe --ai online <package>
 TOGETHER_API_KEY=... npx npx-vibe --ai online <package>
 ```
+
+Provider-specific environment variables are the safest and most reliable option because they avoid provider guessing and keep secrets out of shell history. Recognizable direct-key formats can be routed automatically, but ambiguous formats stop locally and ask for `--provider` rather than sending a credential to a guessed service.
+
+Google introduced new Gemini authorization keys in June 2026. `npx-vibe 1.1.1` recognizes both the newer authorization-key family and traditional Google API keys, and sends Gemini credentials using Google's documented `x-goog-api-key` header.
+
+PowerShell example:
+
+```powershell
+$env:GEMINI_API_KEY="<new-key>"
+npx npx-vibe --ai online --provider gemini esbuild
+Remove-Item Env:GEMINI_API_KEY
+```
+
+Direct-key example when you intentionally want to specify the provider:
+
+```powershell
+npx npx-vibe --provider gemini --api-key "<new-key>" esbuild
+```
+
+If automatic routing cannot confidently identify a direct key, `npx-vibe` exits locally with instructions to add `--provider`. It does not try the key against OpenAI or any other guessed endpoint.
 
 Custom OpenAI-compatible endpoint:
 

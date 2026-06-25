@@ -180,6 +180,7 @@ export async function callResolvedProvider(provider, messages, config = {}) {
         messages,
       }),
       timeoutMs: config.aiTimeoutMs ?? 30_000,
+      secrets: [provider.apiKey],
     });
   }
 
@@ -201,6 +202,7 @@ export async function callResolvedProvider(provider, messages, config = {}) {
           .map((message) => ({ role: message.role === "assistant" ? "assistant" : "user", content: message.content })),
       }),
       timeoutMs: config.aiTimeoutMs ?? 30_000,
+      secrets: [provider.apiKey],
     });
   }
 
@@ -210,12 +212,13 @@ export async function callResolvedProvider(provider, messages, config = {}) {
       .filter((message) => message.role !== "system")
       .map((message) => message.content)
       .join("\n\n");
-    const separator = provider.url.includes("?") ? "&" : "?";
-    const url = `${provider.url}${separator}key=${encodeURIComponent(provider.apiKey)}`;
 
-    return fetchJsonLike(url, {
+    return fetchJsonLike(provider.url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": provider.apiKey,
+      },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: user }] }],
@@ -225,6 +228,7 @@ export async function callResolvedProvider(provider, messages, config = {}) {
         },
       }),
       timeoutMs: config.aiTimeoutMs ?? 30_000,
+      secrets: [provider.apiKey],
     });
   }
 
@@ -249,7 +253,13 @@ function detectProviderName(config) {
     return "openai-compatible";
   }
   if (config.apiKey) {
-    return inferProviderFromKey(config.apiKey);
+    const inferred = inferProviderFromKey(config.apiKey);
+    if (!inferred) {
+      throw new Error(
+        "Could not safely identify the API-key provider. Pass --provider openai|anthropic|gemini|openrouter|groq|together, or use the provider-specific environment variable."
+      );
+    }
+    return inferred;
   }
 
   for (const [provider, keyName] of [
@@ -271,11 +281,11 @@ function detectProviderName(config) {
 }
 
 function inferProviderFromKey(apiKey) {
-  const key = String(apiKey);
+  const key = String(apiKey).trim();
   if (key.startsWith("sk-ant-")) {
     return "anthropic";
   }
-  if (key.startsWith("AIza")) {
+  if (key.startsWith("AIza") || key.startsWith("AO.")) {
     return "gemini";
   }
   if (key.startsWith("gsk_")) {
@@ -284,7 +294,10 @@ function inferProviderFromKey(apiKey) {
   if (key.startsWith("sk-or-")) {
     return "openrouter";
   }
-  return "openai";
+  if (key.startsWith("sk-proj-") || key.startsWith("sk-svcacct-")) {
+    return "openai";
+  }
+  return null;
 }
 
 function normalizeModelProfile(value) {
@@ -340,7 +353,8 @@ async function fetchJsonLike(url, options) {
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new Error(`${response.status} ${response.statusText}${body ? `: ${body.slice(0, 300)}` : ""}`);
+      const safeBody = redactSecrets(body.slice(0, 300), options.secrets);
+      throw new Error(`${response.status} ${response.statusText}${safeBody ? `: ${safeBody}` : ""}`);
     }
 
     return response.json();
@@ -352,4 +366,12 @@ async function fetchJsonLike(url, options) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function redactSecrets(value, secrets = []) {
+  let safe = String(value ?? "");
+  for (const secret of secrets.filter(Boolean)) {
+    safe = safe.split(String(secret)).join("[REDACTED]");
+  }
+  return safe;
 }
