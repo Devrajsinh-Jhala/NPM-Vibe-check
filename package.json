@@ -1,6 +1,6 @@
 {
   "name": "npx-vibe",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Evidence-first safety checks for npm packages before npx executes them.",
   "type": "module",
   "homepage": "https://devrajsinh-jhala.github.io/NPM-Vibe-check/",
@@ -24,7 +24,8 @@
     "site:preview": "node scripts/serve-site.js",
     "test": "node test/run-tests.js",
     "verify": "npm run build && npm test",
-    "prepublishOnly": "npm run verify"
+    "smoke:pack": "node scripts/smoke-pack.js",
+    "prepublishOnly": "npm run verify && npm run smoke:pack"
   },
   "engines": {
     "node": ">=20"

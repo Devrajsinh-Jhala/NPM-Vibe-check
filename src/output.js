@@ -29,10 +29,14 @@ export function renderDashboard(result, options = {}) {
       `from ${result.stats.fileCount} package ${pluralize("file", result.stats.fileCount)}`
   );
   lines.push(...trustContextLines(result.stats.trustContext, color));
+  lines.push(...reviewHistoryLines(result.history, color));
 
   if (result.ai.status === "ok") {
     const profile = result.ai.modelSource?.startsWith("profile:") ? ` [${result.ai.modelProfile}]` : "";
     lines.push(`AI review: ${result.ai.providerLabel ?? result.ai.provider} ${result.ai.model}${profile} (${result.ai.confidence} confidence)`);
+    const verified = result.ai.findings.filter((finding) => finding.evidenceVerified).length;
+    const unsupported = result.ai.unsupportedFindingCount ?? 0;
+    lines.push(`AI evidence: ${verified} source-backed ${pluralize("finding", verified)}${unsupported ? `; ${unsupported} unsupported omitted` : ""}`);
   } else if (result.ai.status === "skipped") {
     lines.push(`AI review: skipped (${result.ai.reason})`);
   } else {
@@ -62,7 +66,22 @@ export function renderDashboard(result, options = {}) {
 
   if (result.ai.status === "ok" && result.ai.summary) {
     lines.push("");
-    lines.push(`AI summary: ${result.ai.summary}`);
+    lines.push(`AI interpretation: ${result.ai.summary}`);
+  }
+
+  const aiFindings = result.ai.status === "ok"
+    ? result.ai.findings.filter((finding) => finding.evidenceVerified).slice(0, 6)
+    : [];
+  if (aiFindings.length) {
+    lines.push("");
+    lines.push("AI source-backed findings:");
+    for (const finding of aiFindings) {
+      const location = finding.file ? ` in ${finding.file}${finding.line ? `:${finding.line}` : ""}` : "";
+      const marker = colorSeverity(finding.severity, color)(finding.severity.toUpperCase().padEnd(8));
+      lines.push(`- ${marker}${location}`);
+      lines.push(`  Evidence: ${trim(finding.evidence, 180)}`);
+      lines.push(`  ${trim(finding.rationale, 220)}`);
+    }
   }
 
   lines.push("");
@@ -112,6 +131,39 @@ function trustContextLines(trustContext, color) {
   return [
     `${label}: ${trustContext.signals.join(", ")}`,
     color.dim(trustContext.note),
+  ];
+}
+
+function reviewHistoryLines(history, color) {
+  if (!history || history.status === "disabled") {
+    return [];
+  }
+  const saveWarning = history.saveWarning
+    ? [color.dim(`Review memory: result was not saved (${trim(history.saveWarning, 140)})`)]
+    : [];
+  if (history.status === "unavailable") {
+    return [color.dim(`Review memory: unavailable (${trim(history.reason, 140)})`), ...saveWarning];
+  }
+  if (history.status === "first-review") {
+    return ["Review memory: first local scan of this package integrity.", ...saveWarning];
+  }
+  if (history.status === "unchanged") {
+    return [
+      `Review memory: unchanged tarball since ${formatDate(history.reviewedAt)}; previous ${capitalize(history.previousVerdict)} ${history.previousScore}/100.`,
+      ...saveWarning,
+    ];
+  }
+
+  const changes = history.changes ?? {};
+  const fileChanges = (changes.addedFiles?.length ?? 0) + (changes.removedFiles?.length ?? 0) + (changes.changedFiles?.length ?? 0);
+  return [
+    `Version comparison: ${history.previousVersion ?? "previous review"} → current; integrity changed.`,
+    color.dim(
+      `${fileChanges} selected ${pluralize("file", fileChanges)} changed; ` +
+      `findings +${changes.addedFindings?.length ?? 0}/-${changes.resolvedFindings?.length ?? 0}; ` +
+      `install hooks ${changes.lifecycleScriptsChanged ? "changed" : "unchanged"}.`
+    ),
+    ...saveWarning,
   ];
 }
 
@@ -179,6 +231,11 @@ function formatCount(value) {
 function trim(value, max) {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function capitalize(value) {
+  const text = String(value ?? "unknown");
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
 function createColor(enabled) {

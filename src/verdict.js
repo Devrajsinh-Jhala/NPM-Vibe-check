@@ -10,14 +10,22 @@ export function decideVerdict(analysis, aiReview, options = {}) {
   }
 
   if (aiReview?.status === "ok") {
-    score = Math.max(score, Number(aiReview.riskScore ?? 0));
+    const aiScore = aiReview.evidenceSufficientForBlock === false
+      ? Math.min(Number(aiReview.riskScore ?? 0), cautionScore + 10)
+      : Number(aiReview.riskScore ?? 0);
+    score = Math.max(score, aiScore);
     if (aiReview.confidence === "low" && analysis.needsAi) {
       score = Math.max(score, cautionScore + 5);
       reasons.push("AI confidence was low.");
     }
     if (aiReview.recommendedVerdict === "block") {
-      score = Math.max(score, blockScore);
-      reasons.push("AI recommended blocking.");
+      if (aiReview.evidenceSufficientForBlock) {
+        score = Math.max(score, blockScore);
+        reasons.push("AI recommended blocking with source-backed high-risk evidence.");
+      } else {
+        score = Math.max(score, cautionScore);
+        reasons.push("AI block recommendation lacked source-backed high-risk evidence.");
+      }
     } else if (aiReview.recommendedVerdict === "caution") {
       score = Math.max(score, cautionScore);
       reasons.push("AI recommended caution.");

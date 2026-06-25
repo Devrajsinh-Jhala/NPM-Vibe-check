@@ -18,6 +18,7 @@ The default scan is deterministic, local, and requires no account or API key. AI
 - [GitHub repository](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check)
 - [Security policy](./SECURITY.md)
 - [Changelog](./CHANGELOG.md)
+- [Release process](./RELEASING.md)
 
 ## Live adoption
 
@@ -66,7 +67,7 @@ By default, execution uses npm with install scripts ignored. Use `--allow-instal
 
 ## Evidence, not mystery scores
 
-Every deterministic source finding includes the matched line and a bounded excerpt. Registry popularity is displayed separately as context and never overrides suspicious code. The example below mirrors a real `npx-vibe 1.0.0` scan; registry dates and download counts naturally change over time.
+Every deterministic source finding includes the matched line and a bounded excerpt. Registry popularity is displayed separately as context and never overrides suspicious code. Local review memory is keyed by the verified package integrity—not merely its name or version. The example below mirrors a real scan; registry dates and download counts naturally change over time.
 
 ```text
 $ npx npx-vibe --check esbuild
@@ -77,6 +78,7 @@ Downloads: 241,858,907/week  Package age: 3132d  Version age: 12d
 Install hooks: postinstall
 Established signals: long registry history, high weekly adoption, linked GitHub repository
 Registry popularity and age provide context, but never override code findings.
+Review memory: unchanged tarball since 2026-06-25; previous Caution 43/100.
 AI review: skipped (Heuristic-only mode; AI was not requested.)
 
 Findings:
@@ -92,7 +94,7 @@ Action: review recommended before execution.
 
 A popular package can still receive **Caution** when it performs sensitive install-time behavior. That is intentional: maturity is useful context, not a security exemption.
 
-When AI is explicitly enabled, the resolved provider and model are visible in the result. This representative example shows the additional review layer; model wording can vary:
+When AI is explicitly enabled, the resolved provider and model are visible in the result. This example is adapted from the successful Gemini 3.5 Flash run on June 25, 2026; model wording can vary:
 
 ```text
 $ npx npx-vibe --check --ai online --provider gemini --model-profile balanced esbuild
@@ -101,10 +103,11 @@ esbuild@0.28.1
 
 Install hooks: postinstall
 AI review: Gemini gemini-3.5-flash [balanced] (high confidence)
+AI evidence: 0 source-backed findings
 
-AI summary: The install script downloads a platform-specific binary and invokes
-package-manager tooling. No credential access, obfuscation, or persistence was found
-in the selected files, but the install-time network and process behavior merits review.
+AI interpretation: The selected install script appears to resolve a platform-specific binary.
+No additional source-backed credential access, obfuscation, or persistence finding was
+identified, but the deterministic install-time network and process evidence remains.
 
 Action: review recommended before execution.
 ```
@@ -119,7 +122,25 @@ Action: review recommended before execution.
 | Source behavior | secret/environment access, network calls, shell execution, external payloads, obfuscation, persistence, mining indicators |
 | Dependency metadata | remote Git/HTTP/file dependency protocols and lockfile install-script indicators |
 | Repository context | GitHub repository, stars, last update, last push, and latest commit |
+| Review memory | verified integrity match, previous verdict, selected-file changes, lifecycle-hook changes, and finding deltas |
 | Optional AI | local Ollama or supported online providers, used only after explicit opt-in and a heuristic trigger |
+
+## Built for repeated use
+
+`npx-vibe` always performs a fresh registry lookup, tarball download, integrity verification, and deterministic scan. Local review memory adds comparison context after those checks:
+
+```text
+Review memory: unchanged tarball since 2026-06-25; previous Caution 43/100.
+```
+
+When the integrity changes:
+
+```text
+Version comparison: 0.28.1 → current; integrity changed.
+2 selected files changed; findings +1/-0; install hooks unchanged.
+```
+
+The history file stores package versions, integrity hashes, selected-file hashes, finding identifiers, verdicts, and model metadata. It does not store package source, API keys, environment values, or local project files. The default location is `~/.npx-vibe/reviews.json`.
 
 ## Verdicts
 
@@ -179,6 +200,8 @@ Useful options:
 --caution-score <0-100>
 --block-score <0-100>
 --allow-install-scripts
+--no-history
+--history-file <path>
 --no-color
 ```
 
@@ -211,7 +234,7 @@ TOGETHER_API_KEY=... npx npx-vibe --ai online <package>
 
 Provider-specific environment variables are the safest and most reliable option because they avoid provider guessing and keep secrets out of shell history. Recognizable direct-key formats can be routed automatically, but ambiguous formats stop locally and ask for `--provider` rather than sending a credential to a guessed service.
 
-Google introduced new Gemini authorization keys in June 2026. `npx-vibe 1.1.1` recognizes both the newer authorization-key family and traditional Google API keys, and sends Gemini credentials using Google's documented `x-goog-api-key` header.
+Google introduced new Gemini authorization keys in June 2026. `npx-vibe 1.2.0` recognizes both the newer authorization-key family and traditional Google API keys, and sends Gemini credentials using Google's documented `x-goog-api-key` header.
 
 PowerShell example:
 
@@ -241,6 +264,8 @@ npx npx-vibe --ai online \
 ```
 
 Online AI receives bounded package metadata, deterministic findings, install scripts, and selected files from the downloaded package tarball. It does not receive your project files, shell history, npm tokens, or environment-variable values.
+
+AI findings are checked against the inspected source before they are displayed as evidence. A model finding records its file, line, exact excerpt, and rationale. Unsupported model claims are omitted from the source-backed findings section, and an unsupported AI recommendation cannot independently produce a Block verdict.
 
 ### Choose a model without memorizing provider catalogs
 
@@ -287,7 +312,9 @@ Use JSON plus exit codes in CI or local automation:
 npx npx-vibe --json <package> > npx-vibe-report.json
 ```
 
-The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. npm publishing automatically runs syntax checks and the complete test suite through `prepublishOnly`. The interactive website demo labels real scans and synthetic malicious fixtures separately.
+The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. CI also packs the npm tarball, installs it into a clean temporary consumer project, and exercises the shipped CLI.
+
+The tag-driven release workflow is prepared for [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) and `npm publish --provenance`. Configure the trusted publisher once, then push a version tag to publish without storing a long-lived npm token. See [RELEASING.md](./RELEASING.md).
 
 ## Configuration
 
@@ -298,6 +325,8 @@ NPX_VIBE_API_KEY=...
 NPX_VIBE_API_URL=https://api.openai.com/v1/chat/completions
 NPX_VIBE_MODEL_PROFILE=balanced
 NPX_VIBE_MODEL=gpt-5.4-mini
+NPX_VIBE_HISTORY=on
+NPX_VIBE_HISTORY_FILE=~/.npx-vibe/reviews.json
 NPX_VIBE_OLLAMA_URL=http://127.0.0.1:11434
 NPX_VIBE_OLLAMA_MODEL=qwen2.5-coder
 NPX_VIBE_AGE_DAYS=14

@@ -79,8 +79,71 @@ test("dashboard identifies the resolved AI model profile", () => {
       modelSource: "profile:balanced",
       confidence: "high",
       summary: "No suspicious behavior found.",
+      findings: [],
+      unsupportedFindingCount: 0,
+    },
+    history: {
+      status: "unchanged",
+      reviewedAt: "2026-06-25T00:00:00.000Z",
+      previousVerdict: "caution",
+      previousScore: 43,
+      saveWarning: "read-only filesystem",
     },
   }, { color: false });
 
   assert.match(dashboard, /Gemini gemini-3\.5-flash \[balanced\] \(high confidence\)/);
+  assert.match(dashboard, /Review memory: unchanged tarball/);
+  assert.match(dashboard, /result was not saved \(read-only filesystem\)/);
+  assert.match(dashboard, /AI evidence: 0 source-backed findings/);
+});
+
+test("dashboard renders version comparison and source-backed AI findings", () => {
+  const dashboard = renderDashboard({
+    package: { name: "demo", version: "2.0.0" },
+    profile: { npm: {}, maintainers: [], maintainersCount: 0 },
+    verdict: { verdict: "caution", score: 50 },
+    stats: {
+      weeklyDownloads: 10,
+      packageAgeDays: 30,
+      versionAgeDays: 1,
+      lifecycleScripts: [{ name: "postinstall" }],
+      selectedFileCount: 1,
+      fileCount: 2,
+      trustContext: { signals: [] },
+    },
+    findings: [],
+    history: {
+      status: "changed",
+      previousVersion: "1.0.0",
+      changes: {
+        addedFiles: [],
+        removedFiles: [],
+        changedFiles: ["install.js"],
+        addedFindings: ["high:download_and_execute:install.js"],
+        resolvedFindings: [],
+        lifecycleScriptsChanged: false,
+      },
+    },
+    ai: {
+      status: "ok",
+      provider: "gemini",
+      providerLabel: "Gemini",
+      model: "gemini-3.5-flash",
+      confidence: "high",
+      summary: "A source-backed concern was found.",
+      unsupportedFindingCount: 0,
+      findings: [{
+        severity: "high",
+        file: "install.js",
+        line: 12,
+        evidence: "child_process.execSync(command)",
+        rationale: "Executes a downloaded command.",
+        evidenceVerified: true,
+      }],
+    },
+  }, { color: false });
+
+  assert.match(dashboard, /Version comparison: 1\.0\.0 → current/);
+  assert.match(dashboard, /AI source-backed findings:/);
+  assert.match(dashboard, /install\.js:12/);
 });

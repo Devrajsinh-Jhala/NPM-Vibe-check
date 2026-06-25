@@ -11,6 +11,12 @@ import { maybeRunAiReview } from "./ai.js";
 import { decideVerdict, checkExitCode } from "./verdict.js";
 import { renderDashboard, toJsonResult } from "./output.js";
 import { formatProviderModelCatalog, modelProfiles } from "./providers.js";
+import {
+  compareReviewMemory,
+  createReviewFingerprint,
+  loadReviewMemory,
+  saveReviewMemory,
+} from "./history.js";
 
 export async function main(argv = process.argv.slice(2)) {
   try {
@@ -63,7 +69,7 @@ export async function run(argv, env = process.env) {
   return executePackage(snapshot, manifest, config.packageArgs, config);
 }
 
-export async function reviewPackage(packageSpecInput, config) {
+export async function reviewPackage(packageSpecInput, config = {}) {
   const spec = parsePackageSpec(packageSpecInput);
   const snapshot = await loadPackageSnapshot(spec, config);
   const tarball = await downloadTarball(snapshot.tarball, config);
@@ -80,6 +86,16 @@ export async function reviewPackage(packageSpecInput, config) {
   }
 
   let analysis = analyzePackage(snapshot, tarballInspection, config);
+  const memory = loadReviewMemory(config);
+  const fingerprint = createReviewFingerprint(snapshot, integrity, analysis, tarballInspection);
+  const reviewHistory = compareReviewMemory(memory, fingerprint);
+  analysis = {
+    ...analysis,
+    stats: {
+      ...analysis.stats,
+      reviewHistory,
+    },
+  };
   const aiReview = await maybeRunAiReview(snapshot, analysis, tarballInspection, config);
 
   if (analysis.needsAi && aiReview.status === "unavailable") {
@@ -89,33 +105,44 @@ export async function reviewPackage(packageSpecInput, config) {
   const verdict = decideVerdict(analysis, aiReview, config);
   const binInfo = safeFindBinCommand(analysis.manifest, spec);
 
+  const result = {
+    package: {
+      name: spec.name,
+      requested: spec.wanted,
+      version: snapshot.version,
+      tarball: snapshot.tarball,
+      integrity: {
+        checked: integrity.checked,
+        ok: integrity.ok,
+        key: fingerprint.integrityKey,
+      },
+      bin: binInfo.command,
+    },
+    profile: snapshot.profile,
+    verdict,
+    stats: analysis.stats,
+    findings: analysis.findings,
+    ai: sanitizeAiReview(aiReview),
+    history: reviewHistory,
+    execution: {
+      npmPackage: `${spec.name}@${snapshot.version}`,
+      bin: binInfo.command,
+      installScripts: config.allowInstallScripts ? "allow-reviewed-root" : "ignored",
+      binError: binInfo.error,
+    },
+  };
+  const historyWrite = saveReviewMemory(memory, fingerprint, result);
+  if (!historyWrite.saved && historyWrite.reason && historyWrite.reason !== "disabled") {
+    result.history = {
+      ...result.history,
+      saveWarning: historyWrite.reason,
+    };
+  }
+
   return {
     snapshot,
     manifest: analysis.manifest,
-    result: {
-      package: {
-        name: spec.name,
-        requested: spec.wanted,
-        version: snapshot.version,
-        tarball: snapshot.tarball,
-        integrity: {
-          checked: integrity.checked,
-          ok: integrity.ok,
-        },
-        bin: binInfo.command,
-      },
-      profile: snapshot.profile,
-      verdict,
-      stats: analysis.stats,
-      findings: analysis.findings,
-      ai: sanitizeAiReview(aiReview),
-      execution: {
-        npmPackage: `${spec.name}@${snapshot.version}`,
-        bin: binInfo.command,
-        installScripts: config.allowInstallScripts ? "allow-reviewed-root" : "ignored",
-        binError: binInfo.error,
-      },
-    },
+    result,
   };
 }
 
@@ -151,6 +178,8 @@ export function parseArgs(argv, env = process.env) {
     timeoutMs: numberFromEnv(env.NPX_VIBE_TIMEOUT_MS, 15_000),
     aiTimeoutMs: numberFromEnv(env.NPX_VIBE_AI_TIMEOUT_MS, 30_000),
     maxAiChars: numberFromEnv(env.NPX_VIBE_MAX_AI_CHARS, 120_000),
+    historyEnabled: env.NPX_VIBE_HISTORY !== "off",
+    historyFile: env.NPX_VIBE_HISTORY_FILE,
     npmBin: env.NPX_VIBE_NPM_BIN,
     check: false,
     json: false,
@@ -217,6 +246,12 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--allow-install-scripts":
           config.allowInstallScripts = true;
+          break;
+        case "--no-history":
+          config.historyEnabled = false;
+          break;
+        case "--history-file":
+          config.historyFile = readValue();
           break;
         case "--ai":
           config.aiMode = readValue();
@@ -405,6 +440,9 @@ function sanitizeAiReview(aiReview) {
     recommendedVerdict: aiReview.recommendedVerdict,
     summary: aiReview.summary,
     findings: aiReview.findings ?? [],
+    evidenceCoverage: aiReview.evidenceCoverage,
+    evidenceSufficientForBlock: aiReview.evidenceSufficientForBlock,
+    unsupportedFindingCount: aiReview.unsupportedFindingCount,
   };
 }
 
@@ -479,6 +517,8 @@ Options:
   --caution-score <0-100>    Default 40
   --block-score <0-100>      Default 70
   --allow-install-scripts    Let npm run reviewed root install scripts where npm supports allow-scripts
+  --no-history               Do not read or update local review memory
+  --history-file <path>      Override the local review-memory file
   --no-color
   --help, -h
   --version, -v
@@ -499,7 +539,8 @@ Provider routing:
 
 Dashboard details:
   Shows npm updated date, version publish date, license, maintainers,
-  repository activity, registry trust context, and matched source evidence.
+  repository activity, registry trust context, matched source evidence,
+  and integrity-keyed comparison with earlier local reviews.
 
 Privacy:
   Online AI review sends only selected package metadata/files from the npm tarball.

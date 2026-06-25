@@ -2,6 +2,25 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 1.2.0 - 2026-06-25
+
+### Added
+
+- Integrity-keyed local review memory that recognizes unchanged tarballs without skipping fresh verification or scanning.
+- Version comparison for changed selected files, lifecycle hooks, and deterministic finding deltas.
+- Source matching for AI findings, including file, line, exact evidence, and rationale.
+- Packed-tarball installation smoke tests that exercise the CLI users actually receive.
+- A tag-driven npm trusted-publishing workflow with provenance and generated GitHub Releases.
+- A release runbook for configuring npm OIDC publishing safely.
+
+### Changed
+
+- Unsupported AI claims can no longer independently elevate a package to Block.
+- The terminal reports source-backed AI coverage and omits unsupported AI findings from the evidence section.
+- AI prompts forbid unsupported claims about package identity, publisher legitimacy, or cryptographic behavior.
+- The landing page now leads with workflow proof, the real Gemini review, repeat-use memory, release assurance, and an explicit privacy data flow.
+- Version bumped to `1.2.0`.
+
 ## 1.1.1 - 2026-06-25
 
 ### Fixed

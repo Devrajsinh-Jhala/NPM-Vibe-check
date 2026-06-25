@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 const files = [
   "bin/npx-vibe.js",
   "scripts/check-syntax.js",
+  "scripts/smoke-pack.js",
   "scripts/serve-site.js",
   "site/app.js",
   ...readdirSync("src")

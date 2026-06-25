@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { callResolvedProvider, formatProviderModelCatalog, resolveOnlineProvider } from "../src/providers.js";
 import { normalizeRepository } from "../src/profile.js";
+import { normalizeAiReview } from "../src/ai.js";
+import { decideVerdict } from "../src/verdict.js";
 
 test("resolveOnlineProvider auto-detects provider-specific env keys", () => {
   assert.equal(resolveOnlineProvider({ provider: "auto", apiKeys: { ANTHROPIC_API_KEY: "sk-ant-demo" } }).name, "anthropic");
@@ -105,6 +107,60 @@ test("provider JSON errors are reduced to an actionable one-line message", async
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("AI findings are matched back to inspected source evidence", () => {
+  const review = normalizeAiReview(JSON.stringify({
+    riskScore: 62,
+    confidence: "high",
+    recommendedVerdict: "caution",
+    summary: "Install-time process execution deserves review.",
+    findings: [{
+      severity: "high",
+      file: "install.js",
+      line: 2,
+      evidence: "child_process.execSync(command)",
+      rationale: "The installer launches a shell command.",
+    }],
+  }), { provider: "test", model: "test-model" }, {
+    selectedFiles: [{
+      path: "install.js",
+      text: "const child_process = require('child_process');\nchild_process.execSync(command);",
+    }],
+  });
+
+  assert.equal(review.findings[0].evidenceVerified, true);
+  assert.equal(review.evidenceSufficientForBlock, true);
+  assert.equal(review.evidenceCoverage, 1);
+});
+
+test("unsupported AI block recommendations are reduced to caution", () => {
+  const review = normalizeAiReview(JSON.stringify({
+    riskScore: 99,
+    confidence: "high",
+    recommendedVerdict: "block",
+    summary: "Claims unsupported behavior.",
+    findings: [{
+      severity: "critical",
+      file: "missing.js",
+      line: 1,
+      evidence: "stealEverything()",
+      rationale: "Unsupported.",
+    }],
+  }), { provider: "test", model: "test-model" }, {
+    selectedFiles: [{ path: "install.js", text: "console.log('safe')" }],
+  });
+
+  assert.equal(review.findings[0].evidenceVerified, false);
+  assert.equal(review.recommendedVerdict, "caution");
+  assert.equal(review.confidence, "low");
+  const verdict = decideVerdict({
+    staticScore: 0,
+    needsAi: true,
+    findings: [],
+  }, review);
+  assert.equal(verdict.verdict, "caution");
+  assert.ok(verdict.score < 70);
 });
 
 test("resolveOnlineProvider defaults to the balanced current model profile", () => {

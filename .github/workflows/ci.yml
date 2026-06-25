@@ -27,4 +27,4 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: npm install --ignore-scripts
       - run: npm run verify
-      - run: npm pack --dry-run
+      - run: npm run smoke:pack

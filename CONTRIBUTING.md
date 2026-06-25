@@ -24,11 +24,13 @@ npm run site:preview
 - A security rule should include a focused test and evidence that explains the match.
 - False-positive fixes should generalize from behavior, not hard-code trust for a package name.
 - Network-facing features should fail safely and preserve heuristic-only operation.
+- Review-memory changes must remain integrity-keyed and must never bypass fresh scanning.
+- AI finding changes should test source-evidence matching and unsupported-claim handling.
 - User-facing behavior changes should update the README, help output, and changelog.
 
 ## Pull requests
 
-Keep changes focused, describe the security or usability trade-off, and include before/after CLI output when changing findings or verdicts. Run `npm run verify` before opening a pull request.
+Keep changes focused, describe the security or usability trade-off, and include before/after CLI output when changing findings or verdicts. Run `npm run verify` and `npm run smoke:pack` before opening a pull request.
 
 ## Reporting false positives
 

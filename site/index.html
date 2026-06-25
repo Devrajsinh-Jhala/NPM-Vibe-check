@@ -3,12 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>npx-vibe 1.1 — evidence before npm package execution</title>
+    <title>npx-vibe 1.2 — inspect npm packages before execution</title>
     <meta name="description" content="Evidence-first safety checks for npm packages before npx executes them. Heuristic-only by default, zero runtime dependencies, optional AI." />
-    <meta property="og:title" content="npx-vibe 1.1 — know what runs before it runs" />
-    <meta property="og:description" content="Inspect npm metadata, install hooks, tarballs, source evidence, and repository context before package execution." />
+    <meta property="og:title" content="npx-vibe — know what runs before it runs" />
+    <meta property="og:description" content="Verify npm tarballs, inspect install hooks, compare package versions, and optionally add source-backed AI review before execution." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
+    <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#0c0f17" />
+    <link rel="canonical" href="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://api.npmjs.org" crossorigin />
     <link rel="stylesheet" href="./styles.css" />
@@ -27,11 +30,10 @@
           <span>npx-vibe</span>
         </a>
         <div class="links" aria-label="Primary navigation">
-          <a href="#momentum">Downloads</a>
+          <a href="#workflow">How it works</a>
+          <a href="#momentum">Proof</a>
           <a href="#demo">Demo</a>
           <a href="#install">Install</a>
-          <a href="#features">Checks</a>
-          <a href="#trust">Trust</a>
           <a href="#security">Security</a>
         </div>
         <div class="nav-actions">
@@ -42,16 +44,16 @@
 
       <section id="top" class="hero-grid">
         <div class="hero-copy reveal">
-          <p class="eyebrow">Version 1.1.1 &middot; growing in public</p>
+          <p class="eyebrow">Version 1.2.0 &middot; evidence-first npm execution</p>
           <a class="release-badge" href="https://www.npmjs.com/package/npx-vibe" aria-label="View npx-vibe on npm">
             <span class="pulse-dot"></span>
-            <strong><span data-weekly-downloads>235</span> npm downloads this week</strong>
+            <strong><span data-weekly-downloads>623</span> npm downloads this week</strong>
             <span>Live from npm →</span>
           </a>
-          <h1>Know what runs before it runs.</h1>
+          <h1>Inspect npm packages before they execute.</h1>
           <p class="lede">
-            Keep the speed of <code>npx</code> with a visible checkpoint for package history,
-            install hooks, verified tarballs, suspicious source behavior, and line-level evidence.
+            A guarded replacement for <code>npx</code> that verifies the exact tarball, inspects
+            install-time behavior, remembers previous integrity hashes, and shows the evidence.
           </p>
           <div class="cta-row">
             <a class="button primary" href="#install">Try one command</a>
@@ -59,16 +61,16 @@
           </div>
           <div class="trust-row" aria-label="Project highlights">
             <span>Heuristic-only default</span>
-            <span>Evidence per finding</span>
+            <span>Integrity-keyed memory</span>
             <span>Zero runtime dependencies</span>
-            <span>Optional AI</span>
+            <span>Source-backed optional AI</span>
           </div>
         </div>
 
         <div class="hero-visual reveal" aria-label="Animated package scan preview">
           <div class="scan-card npm-card live-scan-card float-a">
             <span class="mini-label live-label"><span class="live-dot"></span>npm downloads</span>
-            <strong><span data-weekly-downloads>235</span> this week</strong>
+            <strong><span data-weekly-downloads>623</span> this week</strong>
             <small data-download-window>Official npm download API</small>
           </div>
           <div class="scan-card hook-card float-b">
@@ -89,9 +91,9 @@
             <pre><code><span class="muted">$</span> npx npx-vibe --check esbuild
 <span class="warn-text">! npx-vibe: Caution</span>  <span class="muted">risk 43/100</span>
 
+Review memory: unchanged tarball
 Finding: network_and_shell
-File: install.js · line 147
-Evidence: fetch(url) ... execSync(...)
+Evidence: install.js · line 147
 Action: review before execution.</code></pre>
           </div>
         </div>
@@ -99,23 +101,45 @@ Action: review before execution.</code></pre>
     </header>
 
     <main class="site-shell">
-      <section class="logo-strip reveal" aria-label="npx-vibe trust signals">
-        <a href="https://www.npmjs.com/package/npx-vibe">npm package</a>
-        <span>Node 20 / 22 / 24</span>
-        <span>Windows</span>
-        <span>macOS</span>
-        <span>Linux</span>
-        <span>MIT</span>
-        <span>0 runtime deps</span>
+      <section class="proof-strip reveal" aria-label="Verified project signals">
+        <article><strong data-weekly-downloads>623</strong><span>npm downloads this week</span></article>
+        <article><strong>37</strong><span>automated tests</span></article>
+        <article><strong>9</strong><span>OS and Node CI targets</span></article>
+        <article><strong>0</strong><span>runtime dependencies</span></article>
+      </section>
+
+      <section id="workflow" class="section workflow-panel reveal">
+        <div class="section-heading compact">
+          <p class="eyebrow">one command, three layers</p>
+          <h2>Inspect. Explain. Remember.</h2>
+          <p>Every run starts from the registry again. Memory adds comparison context; it never replaces verification or suppresses a new finding.</p>
+        </div>
+        <div class="workflow-grid">
+          <article>
+            <span>01</span>
+            <h3>Verify the artifact</h3>
+            <p>Resolve the exact version, download without executing, and verify npm integrity metadata before reading package content.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Explain sensitive behavior</h3>
+            <p>Follow lifecycle targets and show bounded file-and-line evidence for network, shell, secret, obfuscation, and persistence signals.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Compare with the last review</h3>
+            <p>Recognize an unchanged integrity hash or show selected-file, install-hook, and finding deltas when a new version lands.</p>
+          </article>
+        </div>
       </section>
 
       <section id="momentum" class="section momentum-panel reveal" aria-labelledby="momentum-title">
         <div class="momentum-copy">
           <p class="eyebrow">real adoption, updated live</p>
-          <h2 id="momentum-title">The package is already moving.</h2>
+          <h2 id="momentum-title">Adoption you can verify.</h2>
           <p>
             These package-fetch counts come directly from npm's public download API. They are not
-            unique-user counts—just a transparent momentum signal with no analytics pixel or backend.
+            unique-user counts—just a transparent momentum signal served without an analytics pixel or backend.
           </p>
           <a class="source-link" href="https://api.npmjs.org/downloads/range/last-week/npx-vibe">
             View the npm API source →
@@ -124,7 +148,7 @@ Action: review before execution.</code></pre>
         <div class="download-dashboard" data-download-dashboard>
           <div class="download-stat">
             <span class="live-label"><span class="live-dot"></span>live weekly downloads</span>
-            <strong data-weekly-downloads aria-live="polite">235</strong>
+            <strong data-weekly-downloads aria-live="polite">623</strong>
             <small data-download-window>June 17–23, 2026</small>
           </div>
           <div class="trend-card">
@@ -158,32 +182,17 @@ Action: review before execution.</code></pre>
         </div>
       </section>
 
-      <section class="section release-panel reveal">
-        <div>
-          <p class="eyebrow">shipping fast, fixing faster</p>
-          <h2>Clear evidence. Narrow boundaries. Predictable defaults.</h2>
-          <p>
-            The current release is heuristic-only by default, includes line-level evidence, and now
-            refuses to forward ambiguous API keys to a guessed provider.
-          </p>
-        </div>
-        <div class="release-actions">
-          <a class="button primary" href="https://www.npmjs.com/package/npx-vibe">Open npm</a>
-          <a class="button secondary" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/CHANGELOG.md">Read changelog</a>
-        </div>
-      </section>
-
       <section id="demo" class="section demo-section reveal">
         <div class="section-heading">
           <p class="eyebrow">interactive terminal</p>
-          <h2>Heuristics first. AI only when you ask.</h2>
-          <p>Compare deterministic scans with the optional AI layer. Real package scans and synthetic fixtures stay clearly labeled, so the demo never blurs evidence with theatre.</p>
+          <h2>A real scan, with and without AI.</h2>
+          <p>The esbuild AI example is adapted from the successful Gemini 3.5 Flash run on June 25, 2026 and reflects the 1.2 source-evidence rules. AI adds interpretation; deterministic evidence keeps control of the verdict.</p>
         </div>
         <div class="demo-grid">
           <div class="demo-controls" role="tablist" aria-label="Demo scenarios">
             <button class="demo-tab active" type="button" data-demo="proceed"><span class="status-dot good"></span><span>Heuristic · is-number</span><small>Real scan · Proceed</small></button>
             <button class="demo-tab" type="button" data-demo="caution"><span class="status-dot warn"></span><span>Heuristic · esbuild</span><small>Real scan · Caution</small></button>
-            <button class="demo-tab" type="button" data-demo="ai"><span class="status-dot ai"></span><span>AI review · esbuild</span><small>Representative output</small></button>
+            <button class="demo-tab" type="button" data-demo="ai"><span class="status-dot ai"></span><span>AI review · esbuild</span><small>Real Gemini run</small></button>
             <button class="demo-tab" type="button" data-demo="block"><span class="status-dot bad"></span><span>Malicious fixture</span><small>Synthetic · Block</small></button>
           </div>
           <div class="demo-stage">
@@ -217,9 +226,9 @@ Action: review before execution.</code></pre>
               <pre><code>npm install -g npx-vibe</code></pre>
             </div>
             <div class="copy-card mini-command">
-              <button class="copy-button" type="button" data-copy="npx-vibe cowsay -- hello">Copy</button>
-              <span>Review and run</span>
-              <pre><code>npx-vibe cowsay -- hello</code></pre>
+              <button class="copy-button" type="button" data-copy="npx npx-vibe --ai online --provider gemini esbuild">Copy</button>
+              <span>Add Gemini review</span>
+              <pre><code>npx npx-vibe --ai online --provider gemini esbuild</code></pre>
             </div>
             <div class="copy-card mini-command">
               <button class="copy-button" type="button" data-copy="npx npx-vibe --models">Copy</button>
@@ -236,19 +245,19 @@ Action: review before execution.</code></pre>
         <article><div class="icon">03</div><h3>Install-time review</h3><p>Follows lifecycle script targets and selected imports while enforcing strict size and file limits.</p></article>
         <article><div class="icon">04</div><h3>Matched evidence</h3><p>Shows the source line and bounded excerpt behind deterministic findings instead of a mystery score.</p></article>
         <article><div class="icon">05</div><h3>Repository context</h3><p>Displays GitHub activity, latest commit, last push, stars, and npm publishing details for human judgment.</p></article>
-        <article><div class="icon">06</div><h3>Optional AI</h3><p>Uses Ollama or an online provider only after explicit opt-in and only when heuristic signals warrant review.</p></article>
+        <article><div class="icon">06</div><h3>Source-backed AI</h3><p>Matches model findings back to inspected file excerpts; unsupported claims cannot independently cause a Block.</p></article>
       </section>
 
       <section id="trust" class="section trust-panel reveal">
         <div class="section-heading compact">
           <p class="eyebrow">built for repeated use</p>
-          <h2>The boring reliability work is part of the product.</h2>
+          <h2>Release assurance is part of the product.</h2>
         </div>
         <div class="proof-grid">
           <article><strong>9 CI combinations</strong><span>Node 20, 22, and 24 across Linux, Windows, and macOS.</span></article>
-          <article><strong>Publish guarded</strong><span>Syntax and tests run automatically before npm accepts a release.</span></article>
+          <article><strong>Packed install tested</strong><span>CI installs the actual npm tarball and exercises its shipped CLI before release.</span></article>
           <article><strong>False positives welcome</strong><span>A structured report captures package, finding code, and redacted output.</span></article>
-          <article><strong>Security channel</strong><span>Private vulnerability reporting keeps sensitive issues out of public threads.</span></article>
+          <article><strong>Provenance ready</strong><span>A tag-driven trusted-publishing workflow is prepared for npm OIDC provenance.</span></article>
         </div>
         <div class="resource-links">
           <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/actions">CI runs</a>
@@ -297,11 +306,18 @@ Action: review before execution.</code></pre>
       </section>
 
       <section id="privacy" class="section privacy-panel reveal">
-        <div class="privacy-lock">●</div>
-        <div>
+        <div class="privacy-copy">
           <p class="eyebrow">privacy boundary</p>
           <h2>Your workspace is not the prompt.</h2>
-          <p>Online review receives only bounded npm package metadata, findings, install scripts, and selected tarball files. Local project files, tokens, shell history, and environment-variable values stay out.</p>
+          <p>Online review receives only bounded registry metadata, deterministic findings, and selected files from the downloaded npm tarball.</p>
+          <div class="never-sent"><strong>Never sent</strong><span>project files</span><span>API-key values</span><span>npm tokens</span><span>shell history</span><span>environment values</span></div>
+        </div>
+        <div class="data-flow" aria-label="npx-vibe data flow">
+          <div><span>npm registry</span><strong>metadata + tarball</strong></div>
+          <i>→</i>
+          <div class="flow-core"><span>npx-vibe</span><strong>verify + inspect</strong></div>
+          <i>→</i>
+          <div><span>optional model</span><strong>bounded selected files</strong></div>
         </div>
       </section>
     </main>
