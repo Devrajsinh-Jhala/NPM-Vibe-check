@@ -353,8 +353,9 @@ async function fetchJsonLike(url, options) {
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      const safeBody = redactSecrets(body.slice(0, 300), options.secrets);
-      throw new Error(`${response.status} ${response.statusText}${safeBody ? `: ${safeBody}` : ""}`);
+      const safeBody = redactSecrets(body, options.secrets);
+      const detail = summarizeErrorBody(safeBody);
+      throw new Error(`${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`);
     }
 
     return response.json();
@@ -374,4 +375,28 @@ function redactSecrets(value, secrets = []) {
     safe = safe.split(String(secret)).join("[REDACTED]");
   }
   return safe;
+}
+
+function summarizeErrorBody(body) {
+  const text = String(body ?? "").trim();
+  if (!text) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    const error = parsed?.error ?? parsed;
+    const message = error?.message ?? parsed?.message;
+    const reason =
+      error?.details?.find((detail) => typeof detail?.reason === "string")?.reason ??
+      error?.status ??
+      parsed?.code;
+    if (message) {
+      return `${String(message).replace(/\s+/g, " ").trim()}${reason ? ` (${reason})` : ""}`.slice(0, 300);
+    }
+  } catch {
+    // Non-JSON provider errors are normalized below.
+  }
+
+  return text.replace(/\s+/g, " ").slice(0, 300);
 }

@@ -76,6 +76,37 @@ test("provider errors redact the exact API key", async () => {
   }
 });
 
+test("provider JSON errors are reduced to an actionable one-line message", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 400,
+    statusText: "Bad Request",
+    text: async () => JSON.stringify({
+      error: {
+        message: "API key expired. Please renew the API key.",
+        status: "INVALID_ARGUMENT",
+        details: [{ reason: "API_KEY_INVALID" }],
+      },
+    }),
+  });
+
+  try {
+    await assert.rejects(
+      () => callResolvedProvider(
+        resolveOnlineProvider({ provider: "gemini", apiKey: "AO.expired" }),
+        [{ role: "user", content: "review" }],
+        {}
+      ),
+      {
+        message: "400 Bad Request: API key expired. Please renew the API key. (API_KEY_INVALID)",
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("resolveOnlineProvider defaults to the balanced current model profile", () => {
   const gemini = resolveOnlineProvider({ provider: "gemini", apiKey: "AIza-demo" });
   const anthropic = resolveOnlineProvider({ provider: "anthropic", apiKey: "sk-ant-demo" });

@@ -10,6 +10,7 @@ All notable changes to `npx-vibe` are documented here.
 - Send Gemini credentials through the current `x-goog-api-key` header instead of a URL query parameter.
 - Refuse to forward unrecognized direct API keys to a guessed provider.
 - Redact exact API keys from provider error bodies before displaying them.
+- Reduce structured provider failures to concise, actionable one-line messages.
 
 ## 1.1.0 - 2026-06-25
 
