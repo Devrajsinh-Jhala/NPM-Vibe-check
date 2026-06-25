@@ -42,7 +42,7 @@
 
       <section id="top" class="hero-grid">
         <div class="hero-copy reveal">
-          <p class="eyebrow">Version 1.1 · growing in public</p>
+          <p class="eyebrow">Version 1.1.1 &middot; growing in public</p>
           <a class="release-badge" href="https://www.npmjs.com/package/npx-vibe" aria-label="View npx-vibe on npm">
             <span class="pulse-dot"></span>
             <strong><span data-weekly-downloads>235</span> npm downloads this week</strong>
@@ -163,8 +163,8 @@ Action: review before execution.</code></pre>
           <p class="eyebrow">shipping fast, fixing faster</p>
           <h2>Clear evidence. Narrow boundaries. Predictable defaults.</h2>
           <p>
-            The current release is heuristic-only by default, includes line-level evidence, and replaces
-            stale AI defaults with visible fast, balanced, and strong model profiles.
+            The current release is heuristic-only by default, includes line-level evidence, and now
+            refuses to forward ambiguous API keys to a guessed provider.
           </p>
         </div>
         <div class="release-actions">
@@ -275,7 +275,7 @@ Action: review before execution.</code></pre>
         <div class="provider-intro">
           <p class="eyebrow">bring your own model</p>
           <h2>Pick a goal, not a model spreadsheet.</h2>
-          <p>Stay deterministic, keep review local with Ollama, or choose fast, balanced, or strong. The exact resolved model is printed every time, and <code>--model</code> remains available when you want full control.</p>
+          <p>Stay deterministic, keep review local with Ollama, or choose fast, balanced, or strong. The exact resolved model is printed every time. Provider-specific environment variables keep keys out of shell history, new Gemini authorization keys are recognized, and ambiguous direct keys stop safely instead of being sent to a guessed service.</p>
           <div class="model-command"><code>npx npx-vibe --models</code><span>See the bundled mapping</span></div>
         </div>
         <div class="profile-stack" aria-label="AI model profiles">
