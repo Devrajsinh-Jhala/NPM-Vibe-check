@@ -10,6 +10,7 @@ Inspected: 1 selected file from 4 package files
 Established signals: long registry history, high weekly adoption,
 multiple maintainers, linked GitHub repository
 Registry popularity and age provide context, but never override code findings.
+Review memory: first local scan of this package integrity.
 AI review: skipped (No heuristic trigger required model review.)
 
 Action: package may be executed.`,
@@ -23,6 +24,7 @@ Install hooks: postinstall
 Inspected: 3 selected files from 7 package files
 Established signals: long registry history, high weekly adoption,
 linked GitHub repository
+Review memory: unchanged tarball since 2026-06-25; previous Caution 43/100.
 AI review: skipped (Heuristic-only mode; AI was not requested.)
 
 Findings:
@@ -44,7 +46,9 @@ esbuild@0.28.1
 
 Install hooks: postinstall
 Inspected: 3 selected files from 7 package files
+Review memory: unchanged tarball since 2026-06-25; previous Caution 43/100.
 AI review: Gemini gemini-3.5-flash [balanced] (high confidence)
+AI evidence: 0 source-backed findings
 
 Findings:
 - MEDIUM   lifecycle_hook in package.json
@@ -52,9 +56,10 @@ Findings:
 - MEDIUM   network_and_shell in install.js
   Code combines network access with shell execution.
 
-AI summary: The install script downloads a platform-specific binary
-and invokes package-manager tooling. No credential access,
-obfuscation, or persistence was found in the selected files.
+AI interpretation: The selected install script appears to resolve a
+platform-specific binary. No additional source-backed credential access,
+obfuscation, or persistence finding was identified, but the deterministic
+install-time network and process evidence remains.
 
 Action: review recommended before execution.`,
   block: `# Synthetic malicious fixture from the npx-vibe test suite
@@ -83,8 +88,8 @@ const demoMeta = {
     note: "Real heuristic-only output. Popularity is context; install-time behavior still receives Caution.",
   },
   ai: {
-    label: "optional AI · representative",
-    note: "Representative model response using the real deterministic esbuild findings. Exact AI wording varies by provider and model.",
+    label: "optional AI · real Gemini run",
+    note: "Adapted from a successful Gemini 3.5 Flash review on June 25, 2026 to reflect the 1.2 source-evidence rules. Model wording varies; deterministic evidence remains authoritative.",
   },
   block: {
     label: "deterministic · synthetic fixture",
