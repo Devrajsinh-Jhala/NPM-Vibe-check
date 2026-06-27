@@ -1,18 +1,18 @@
 :root {
   color-scheme: light;
-  --bg: #f7f8fb;
+  --bg: #ffffff;
+  --bg-soft: #f7f8fb;
   --surface: #ffffff;
-  --surface-soft: #f3f6fa;
-  --text: #121826;
+  --surface-soft: #f3f5f8;
+  --text: #111827;
   --muted: #667085;
+  --muted-strong: #344054;
   --line: #e4e7ec;
   --line-strong: #d0d5dd;
   --accent: #0f766e;
   --accent-soft: #ecfdf5;
   --warning: #b54708;
   --warning-soft: #fffaeb;
-  --danger: #b42318;
-  --danger-soft: #fef3f2;
   --shadow: 0 18px 48px rgba(16, 24, 40, 0.08);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -30,7 +30,8 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 42%, #ffffff 100%);
   color: var(--text);
 }
 
@@ -58,9 +59,9 @@ p {
 h1 {
   max-width: 760px;
   margin-bottom: 22px;
-  font-size: clamp(2.8rem, 5.6vw, 5rem);
-  line-height: 0.98;
-  letter-spacing: -0.06em;
+  font-size: clamp(3rem, 6vw, 5.35rem);
+  line-height: 0.96;
+  letter-spacing: -0.065em;
 }
 
 h1 code {
@@ -70,9 +71,9 @@ h1 code {
 
 h2 {
   margin-bottom: 14px;
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-size: clamp(2rem, 4vw, 3.35rem);
   line-height: 1.04;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.048em;
 }
 
 h3 {
@@ -101,12 +102,15 @@ pre {
   overflow-x: auto;
 }
 
-.shell {
+.container {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
 }
 
 .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(12px);
@@ -124,7 +128,7 @@ pre {
 .nav-links,
 .nav-actions,
 .hero-actions,
-.hero-note,
+.hero-meta,
 .footer,
 .footer div {
   display: flex;
@@ -164,6 +168,7 @@ pre {
 }
 
 .nav-links a:hover,
+.text-link:hover,
 .footer a:hover {
   color: var(--accent);
 }
@@ -186,24 +191,36 @@ pre {
   background: var(--surface);
 }
 
-.button.dark {
+.button-dark {
   border-color: var(--text);
   color: #ffffff;
   background: var(--text);
 }
 
-.button.small {
+.button-light {
+  background: #ffffff;
+}
+
+.button-plain {
+  border-color: transparent;
+  color: var(--muted-strong);
+  background: transparent;
+}
+
+.button-small {
   min-height: 38px;
   padding-inline: 14px;
 }
 
 .hero {
   display: grid;
-  gap: 38px;
-  padding: clamp(58px, 8vw, 96px) 0 38px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+  gap: clamp(36px, 6vw, 76px);
+  align-items: center;
+  padding: clamp(64px, 9vw, 112px) 0 42px;
 }
 
-.eyebrow {
+.badge {
   margin: 0 0 14px;
   color: var(--accent);
   font-size: 0.75rem;
@@ -219,13 +236,45 @@ pre {
   font-size: 1.1rem;
 }
 
+.command-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  width: min(100%, 620px);
+  margin-top: 28px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
+}
+
+.command-bar code {
+  min-width: 0;
+  padding: 12px 10px;
+  overflow-wrap: anywhere;
+}
+
+.command-bar button,
+.copy-command button {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  background: var(--surface-soft);
+}
+
+.command-bar button {
+  padding: 0 14px;
+}
+
 .hero-actions {
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 30px;
+  margin-top: 20px;
 }
 
-.hero-note {
+.hero-meta {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 22px;
@@ -233,46 +282,45 @@ pre {
   font-size: 0.92rem;
 }
 
-.hero-note span {
+.hero-meta span {
   padding: 8px 11px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--surface);
+  background: #ffffff;
 }
 
-.hero-note strong {
+.hero-meta strong {
   color: var(--text);
 }
 
-.product-card,
-.stats,
+.report-card,
+.proof-strip,
 .section,
-.security-note {
+.boundary {
   border: 1px solid var(--line);
-  border-radius: 24px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
 
-.product-card {
+.report-card {
   display: grid;
+  min-width: 0;
   gap: 18px;
-  width: min(100%, 860px);
-  padding: clamp(20px, 3vw, 28px);
+  padding: 22px;
+  border-radius: 24px;
 }
 
-.card-header {
+.report-top,
+.report-package {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
 
-.card-header > span,
-.report-grid span,
-.command-card span {
+.report-top span {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 820;
@@ -280,10 +328,8 @@ pre {
   text-transform: uppercase;
 }
 
-.status {
-  display: inline-flex;
+.report-top strong {
   min-width: max-content;
-  align-items: center;
   padding: 7px 10px;
   border-radius: 999px;
   color: var(--warning);
@@ -291,46 +337,22 @@ pre {
   background: var(--warning-soft);
 }
 
-.package-title {
+.report-package {
   display: grid;
-  gap: 5px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--line);
+  justify-content: initial;
 }
 
-.package-title span {
+.report-package strong {
   overflow-wrap: anywhere;
-  font-size: clamp(1.7rem, 4vw, 2.35rem);
-  font-weight: 850;
-  letter-spacing: -0.045em;
+  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+  letter-spacing: -0.04em;
 }
 
-.package-title small {
+.report-package span {
   color: var(--muted);
-  line-height: 1.5;
 }
 
-.report-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.report-grid div {
-  display: grid;
-  gap: 7px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface-soft);
-}
-
-.finding-list {
-  display: grid;
-  gap: 12px;
-}
-
-.finding-list article {
+.report-finding {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
@@ -338,32 +360,25 @@ pre {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
+  background: var(--surface-soft);
 }
 
-.finding-list article > span {
-  display: inline-flex;
-  align-items: center;
+.report-finding > span {
   padding: 5px 8px;
   border-radius: 999px;
   color: var(--warning);
   font-size: 0.68rem;
   font-weight: 850;
-  text-transform: uppercase;
   background: var(--warning-soft);
 }
 
-.finding-list strong {
-  display: block;
-  margin-bottom: 3px;
-}
-
-.finding-list p {
+.report-finding p {
   margin-bottom: 0;
-  font-size: 0.93rem;
+  font-size: 0.94rem;
   line-height: 1.55;
 }
 
-.product-card pre,
+.report-card pre,
 .terminal {
   border: 1px solid #1f2937;
   border-radius: 18px;
@@ -373,24 +388,25 @@ pre {
   overflow-wrap: anywhere;
 }
 
-.product-card pre {
+.report-card pre {
   padding: 16px;
   font-size: 0.84rem;
   line-height: 1.65;
 }
 
-.product-card pre code,
+.report-card pre code,
 .terminal code {
   color: inherit;
 }
 
-.stats {
+.proof-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
+  border-radius: 22px;
 }
 
-.stats article {
+.proof-strip article {
   display: grid;
   gap: 7px;
   min-height: 112px;
@@ -399,17 +415,17 @@ pre {
   border-right: 1px solid var(--line);
 }
 
-.stats article:last-child {
+.proof-strip article:last-child {
   border-right: 0;
 }
 
-.stats strong {
+.proof-strip strong {
   font-size: clamp(1.75rem, 3vw, 2.45rem);
   line-height: 1;
   letter-spacing: -0.045em;
 }
 
-.stats span {
+.proof-strip span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 780;
@@ -420,9 +436,35 @@ pre {
 .section {
   margin-top: 28px;
   padding: clamp(30px, 5vw, 58px);
+  border-radius: 24px;
 }
 
-.two-column,
+.section-heading {
+  max-width: 770px;
+  margin-bottom: 28px;
+}
+
+.feature-grid,
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.feature-grid article,
+.info-grid article {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.feature-grid p,
+.info-grid p {
+  margin-bottom: 0;
+}
+
+.split,
 .install-section {
   display: grid;
   grid-template-columns: minmax(0, 0.78fr) minmax(420px, 1fr);
@@ -430,48 +472,30 @@ pre {
   align-items: start;
 }
 
-.section-heading {
-  max-width: 760px;
-  margin-bottom: 28px;
-}
-
-.section-body p:last-child {
-  margin-bottom: 0;
-}
-
-.steps,
-.assurance-grid,
-.mini-grid {
+.steps {
   display: grid;
-  gap: 14px;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.steps,
-.assurance-grid,
-.mini-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.steps article,
-.assurance-grid article,
-.mini-grid article {
-  padding: 22px;
+.steps li {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
 }
 
-.steps article > span {
-  display: inline-flex;
-  margin-bottom: 38px;
+.steps li > span {
   color: var(--accent);
-  font-size: 0.75rem;
   font-weight: 850;
-  letter-spacing: 0.1em;
 }
 
-.steps p,
-.assurance-grid p {
+.steps p {
   margin-bottom: 0;
 }
 
@@ -511,10 +535,8 @@ pre {
   background: #f0fdfa;
 }
 
-.demo-tab span,
-.mini-grid span {
+.demo-tab span {
   color: var(--muted);
-  line-height: 1.5;
 }
 
 .terminal {
@@ -535,7 +557,7 @@ pre {
   gap: 12px;
 }
 
-.command-card {
+.copy-command {
   position: relative;
   display: grid;
   gap: 8px;
@@ -546,37 +568,42 @@ pre {
   background: var(--surface);
 }
 
-.command-card code {
+.copy-command span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.copy-command code {
   overflow-wrap: anywhere;
   color: var(--text);
 }
 
-.command-card button {
+.copy-command button {
   position: absolute;
   top: 14px;
   right: 14px;
   padding: 7px 11px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  cursor: pointer;
-  background: #ffffff;
 }
 
-.security-note {
+.boundary {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
   gap: 28px;
   align-items: start;
   margin-top: 28px;
   padding: 28px;
+  border-radius: 24px;
   background: #fff7ed;
 }
 
-.security-note strong {
+.boundary strong {
   color: #9a3412;
 }
 
-.security-note p {
+.boundary p {
   margin-bottom: 0;
   color: #7c2d12;
 }
@@ -598,26 +625,27 @@ pre {
 
 .footer a {
   color: #475467;
-  text-decoration: none;
 }
 
 @media (max-width: 980px) {
-  .two-column,
-  .install-section,
-  .steps,
-  .assurance-grid,
-  .mini-grid {
+  .hero,
+  .split,
+  .install-section {
     grid-template-columns: 1fr;
   }
 
-  .steps article > span {
-    margin-bottom: 22px;
+  .report-card {
+    max-width: 720px;
   }
 }
 
 @media (max-width: 760px) {
-  .shell {
+  .container {
     width: min(100% - 24px, 1120px);
+  }
+
+  .site-header {
+    position: static;
   }
 
   .nav {
@@ -630,45 +658,52 @@ pre {
   }
 
   h1 {
-    font-size: clamp(2.65rem, 13vw, 4.3rem);
+    font-size: clamp(2.55rem, 13vw, 4.2rem);
   }
 
   h2 {
-    font-size: clamp(1.9rem, 9vw, 3rem);
+    font-size: clamp(1.85rem, 9vw, 3rem);
   }
 
   .hero {
     padding-top: 48px;
   }
 
-  .hero-note {
+  .command-bar,
+  .report-finding,
+  .proof-strip,
+  .feature-grid,
+  .info-grid,
+  .demo-layout,
+  .boundary {
+    grid-template-columns: 1fr;
+  }
+
+  .command-bar button {
+    min-height: 40px;
+  }
+
+  .hero-meta {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .report-grid,
-  .stats,
-  .demo-layout,
-  .security-note {
-    grid-template-columns: 1fr;
-  }
-
-  .stats article {
+  .proof-strip article {
     min-height: 94px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
 
-  .stats article:last-child {
+  .proof-strip article:last-child {
     border-bottom: 0;
-  }
-
-  .finding-list article {
-    grid-template-columns: 1fr;
   }
 
   .section {
     padding: 28px 20px;
+  }
+
+  .steps li {
+    grid-template-columns: 1fr;
   }
 
   .terminal {
@@ -676,11 +711,11 @@ pre {
     font-size: 0.82rem;
   }
 
-  .command-card {
+  .copy-command {
     padding-right: 18px;
   }
 
-  .command-card button {
+  .copy-command button {
     position: static;
     width: fit-content;
     order: -1;
