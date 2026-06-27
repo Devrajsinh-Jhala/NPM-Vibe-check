@@ -1,15 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="npx-vibe">
-  <defs>
-    <linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#22d3ee"/>
-      <stop offset=".52" stop-color="#8b5cf6"/>
-      <stop offset="1" stop-color="#f0abfc"/>
-    </linearGradient>
-    <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#070a12" flood-opacity=".45"/>
-    </filter>
-  </defs>
-  <rect width="64" height="64" rx="18" fill="#0b1020"/>
-  <path d="M32 7 54 15v16c0 13-8.2 21.4-22 27C18.2 52.4 10 44 10 31V15L32 7Z" fill="url(#g)" filter="url(#s)"/>
-  <path d="M20 32.5c4.4-6.7 8.8 6.7 13.2 0s8.8 6.7 13.2 0" fill="none" stroke="#07101d" stroke-width="4.2" stroke-linecap="round"/>
+  <rect width="64" height="64" rx="16" fill="#0f172a"/>
+  <path d="M32 10 50 17v13c0 11.7-6.7 19.4-18 24-11.3-4.6-18-12.3-18-24V17l18-7Z" fill="#ccfbf1"/>
+  <path d="M23 32h18" stroke="#0f766e" stroke-width="5" stroke-linecap="round"/>
+  <path d="M32 23v18" stroke="#0f766e" stroke-width="5" stroke-linecap="round"/>
 </svg>

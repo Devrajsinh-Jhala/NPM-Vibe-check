@@ -9,7 +9,6 @@ Install hooks: none
 Inspected: 1 selected file from 4 package files
 Established signals: long registry history, high weekly adoption,
 multiple maintainers, linked GitHub repository
-Registry popularity and age provide context, but never override code findings.
 Review memory: first local scan of this package integrity.
 AI review: skipped (No heuristic trigger required model review.)
 
@@ -52,12 +51,6 @@ Review memory: unchanged tarball since 2026-06-25; previous Caution 43/100.
 AI review: Gemini gemini-3.5-flash [balanced] (high confidence)
 AI evidence: 0 source-backed findings
 
-Findings:
-- MEDIUM   lifecycle_hook in package.json
-  postinstall runs: node install.js
-- MEDIUM   network_and_shell in install.js
-  Code combines network access with shell execution.
-
 AI interpretation: The selected install script appears to resolve a
 platform-specific binary. No additional source-backed credential access,
 obfuscation, or persistence finding was identified, but deterministic
@@ -70,7 +63,6 @@ x npx-vibe: Block  risk 100/100
 fixture: install-time secret exfiltration
 
 Install hooks: postinstall
-AI review: skipped (Heuristic-only mode; AI was not requested.)
 
 Findings:
 - CRITICAL possible_secret_exfiltration in postinstall.js
@@ -82,35 +74,21 @@ Action: blocked unless --force is supplied.`
 };
 
 const demoMeta = {
-  proceed: {
-    label: "deterministic scan",
-    note: "Real heuristic-only output. No API key, model, or package execution is involved.",
-  },
-  caution: {
-    label: "lifecycle-hook scan",
-    note: "Real heuristic-only output. Popularity provides context; install-time behavior still receives Caution.",
-  },
-  ai: {
-    label: "optional AI review",
-    note: "Adapted from a successful Gemini review to reflect the 1.2 source-evidence rules. Model wording can vary; deterministic evidence remains authoritative.",
-  },
-  block: {
-    label: "synthetic malicious fixture",
-    note: "Synthetic fixture from the test suite, included to show what a high-confidence Block looks like.",
-  },
+  proceed: "A typical clean package scan. No API key, model, or package execution is involved.",
+  caution: "A real package with install-time behavior. Popularity provides context, but evidence still drives the recommendation.",
+  ai: "Optional AI adds interpretation when requested. Deterministic findings remain the source of truth.",
+  block: "Synthetic test fixture used to demonstrate a high-confidence block recommendation.",
 };
 
 const output = document.querySelector("#demo-output");
-const demoLabel = document.querySelector("#demo-label");
-const demoNote = document.querySelector("#demo-note");
+const note = document.querySelector("#demo-note");
 const tabs = document.querySelectorAll(".demo-tab");
 
 function setDemo(name) {
   if (!output || !demos[name]) return;
 
   output.textContent = demos[name];
-  if (demoLabel) demoLabel.textContent = demoMeta[name].label;
-  if (demoNote) demoNote.textContent = demoMeta[name].note;
+  if (note) note.textContent = demoMeta[name];
 
   tabs.forEach((tab) => {
     const active = tab.dataset.demo === name;
@@ -125,39 +103,29 @@ tabs.forEach((tab) => {
 
 setDemo("proceed");
 
-document.querySelectorAll("[data-copy]").forEach((copyButton) => {
-  const defaultText = copyButton.textContent;
+document.querySelectorAll("[data-copy]").forEach((button) => {
+  const defaultText = button.textContent;
 
-  copyButton.addEventListener("click", async () => {
+  button.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(copyButton.dataset.copy);
-      copyButton.textContent = "Copied";
+      await navigator.clipboard.writeText(button.dataset.copy);
+      button.textContent = "Copied";
     } catch {
-      copyButton.textContent = "Copy failed";
+      button.textContent = "Copy failed";
     }
 
     setTimeout(() => {
-      copyButton.textContent = defaultText;
+      button.textContent = defaultText;
     }, 1300);
   });
 });
 
 const DOWNLOAD_API = "https://api.npmjs.org/downloads/range/last-week/npx-vibe";
 const numberFormatter = new Intl.NumberFormat("en-US");
-const compactFormatter = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
 
-async function loadDownloadMomentum() {
-  const status = document.querySelector("[data-download-status]");
+async function refreshDownloads() {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+  const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
     const response = await fetch(DOWNLOAD_API, {
@@ -168,128 +136,24 @@ async function loadDownloadMomentum() {
     if (!response.ok) throw new Error(`npm API returned ${response.status}`);
 
     const payload = await response.json();
-    const days = Array.isArray(payload.downloads) ? payload.downloads.slice(-7) : [];
-    if (!days.length) throw new Error("npm API returned no daily data");
+    const total = Array.isArray(payload.downloads)
+      ? payload.downloads.reduce((sum, day) => sum + Number(day.downloads || 0), 0)
+      : 0;
 
-    const total = days.reduce((sum, day) => sum + Number(day.downloads || 0), 0);
+    if (!total) return;
+
     document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
-      animateNumber(element, total);
+      element.textContent = numberFormatter.format(total);
       element.setAttribute(
         "title",
         `${numberFormatter.format(total)} downloads from ${payload.start} through ${payload.end}`
       );
     });
-
-    const windowText = formatDateWindow(payload.start, payload.end);
-    document.querySelectorAll("[data-download-window]").forEach((element) => {
-      element.textContent = windowText;
-    });
-
-    renderDownloadChart(days);
-    if (status) status.textContent = `npm API - ${compactFormatter.format(total)} total`;
   } catch (error) {
-    if (status) status.textContent = "Live API unavailable - showing last known value";
-    document.querySelector("[data-download-dashboard]")?.classList.add("is-stale");
     console.warn("Could not refresh npm download count:", error.message);
   } finally {
     clearTimeout(timeout);
   }
 }
 
-function animateNumber(element, target) {
-  const start = Number(String(element.textContent).replace(/,/g, "")) || 0;
-  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  if (prefersReducedMotion || start === target) {
-    element.textContent = numberFormatter.format(target);
-    return;
-  }
-
-  const startedAt = performance.now();
-  const duration = 750;
-
-  const tick = (now) => {
-    const progress = Math.min(1, (now - startedAt) / duration);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    element.textContent = numberFormatter.format(Math.round(start + (target - start) * eased));
-    if (progress < 1) requestAnimationFrame(tick);
-  };
-
-  requestAnimationFrame(tick);
-}
-
-function renderDownloadChart(days) {
-  const line = document.querySelector("[data-chart-line]");
-  const area = document.querySelector("[data-chart-area]");
-  const pointsLayer = document.querySelector("[data-chart-points]");
-  const labels = document.querySelector("[data-chart-labels]");
-  if (!line || !area || !pointsLayer || !labels) return;
-
-  const width = 520;
-  const left = 20;
-  const top = 28;
-  const bottom = 155;
-  const max = Math.max(...days.map((day) => Number(day.downloads || 0)), 1);
-
-  const points = days.map((day, index) => {
-    const x = left + (width / Math.max(days.length - 1, 1)) * index;
-    const y = bottom - (Number(day.downloads || 0) / max) * (bottom - top);
-    return { x, y, day };
-  });
-
-  line.setAttribute("points", points.map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" "));
-  area.setAttribute(
-    "d",
-    `M${left} ${bottom} L${points
-      .map(({ x, y }) => `${x.toFixed(1)} ${y.toFixed(1)}`)
-      .join(" L")} L${left + width} ${bottom} Z`
-  );
-
-  pointsLayer.replaceChildren();
-  const svgNamespace = "http://www.w3.org/2000/svg";
-  points.forEach(({ x, y, day }) => {
-    const circle = document.createElementNS(svgNamespace, "circle");
-    circle.setAttribute("cx", x.toFixed(1));
-    circle.setAttribute("cy", y.toFixed(1));
-    circle.setAttribute("r", "5");
-
-    const title = document.createElementNS(svgNamespace, "title");
-    title.textContent = `${day.day}: ${numberFormatter.format(day.downloads)} downloads`;
-    circle.append(title);
-    pointsLayer.append(circle);
-  });
-
-  labels.replaceChildren(
-    ...days.map((day) => {
-      const label = document.createElement("span");
-      label.textContent = dateFormatter.format(new Date(`${day.day}T00:00:00Z`));
-      return label;
-    })
-  );
-}
-
-function formatDateWindow(start, end) {
-  const startDate = new Date(`${start}T00:00:00Z`);
-  const endDate = new Date(`${end}T00:00:00Z`);
-  return `${dateFormatter.format(startDate)}-${dateFormatter.format(endDate)}, ${endDate.getUTCFullYear()}`;
-}
-
-loadDownloadMomentum();
-
-if ("IntersectionObserver" in window) {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("visible");
-          observer.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.14 }
-  );
-
-  document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
-} else {
-  document.querySelectorAll(".reveal").forEach((element) => element.classList.add("visible"));
-}
+refreshDownloads();
