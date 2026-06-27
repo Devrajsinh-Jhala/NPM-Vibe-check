@@ -1,21 +1,19 @@
 :root {
   color-scheme: light;
-  --bg: #f8fafc;
+  --bg: #f7f8fb;
   --surface: #ffffff;
-  --surface-muted: #f1f5f9;
-  --text: #0f172a;
-  --muted: #64748b;
-  --muted-strong: #334155;
-  --line: #e2e8f0;
-  --line-strong: #cbd5e1;
+  --surface-soft: #f3f6fa;
+  --text: #121826;
+  --muted: #667085;
+  --line: #e4e7ec;
+  --line-strong: #d0d5dd;
   --accent: #0f766e;
-  --accent-soft: #ccfbf1;
-  --blue: #2563eb;
-  --yellow: #a16207;
-  --yellow-soft: #fef3c7;
-  --red: #be123c;
-  --red-soft: #ffe4e6;
-  --shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  --accent-soft: #ecfdf5;
+  --warning: #b54708;
+  --warning-soft: #fffaeb;
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --shadow: 0 18px 48px rgba(16, 24, 40, 0.08);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -32,15 +30,12 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 20% -10%, rgba(204, 251, 241, 0.85), transparent 34rem),
-    linear-gradient(180deg, #ffffff 0%, var(--bg) 42%, #ffffff 100%);
+  background: var(--bg);
   color: var(--text);
 }
 
 body,
-button,
-input {
+button {
   font: inherit;
 }
 
@@ -50,7 +45,6 @@ a {
 }
 
 a {
-  text-decoration-thickness: 1px;
   text-underline-offset: 4px;
 }
 
@@ -64,9 +58,9 @@ p {
 h1 {
   max-width: 760px;
   margin-bottom: 22px;
-  font-size: clamp(2.9rem, 5.4vw, 4.7rem);
+  font-size: clamp(2.8rem, 5.6vw, 5rem);
   line-height: 0.98;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.06em;
 }
 
 h1 code {
@@ -76,15 +70,15 @@ h1 code {
 
 h2 {
   margin-bottom: 14px;
-  font-size: clamp(2rem, 4.5vw, 4rem);
-  line-height: 1;
-  letter-spacing: -0.06em;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.04;
+  letter-spacing: -0.05em;
 }
 
 h3 {
-  margin-bottom: 10px;
+  margin-bottom: 9px;
   font-size: 1.08rem;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
 p {
@@ -99,7 +93,7 @@ pre {
 }
 
 code {
-  color: #4338ca;
+  color: #344054;
 }
 
 pre {
@@ -113,12 +107,9 @@ pre {
 }
 
 .site-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.86);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
 }
 
 .nav {
@@ -126,7 +117,7 @@ pre {
   min-height: 72px;
   align-items: center;
   justify-content: space-between;
-  gap: 22px;
+  gap: 24px;
 }
 
 .brand,
@@ -142,9 +133,8 @@ pre {
 
 .brand {
   gap: 10px;
-  color: var(--text);
-  font-weight: 850;
-  letter-spacing: -0.03em;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   text-decoration: none;
 }
 
@@ -157,14 +147,14 @@ pre {
   border-radius: 10px;
   color: #134e4a;
   font-size: 0.78rem;
-  font-weight: 950;
+  font-weight: 900;
   background: #ccfbf1;
 }
 
 .nav-links {
   gap: 22px;
-  color: var(--muted-strong);
-  font-size: 0.94rem;
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 
 .nav-links a,
@@ -179,8 +169,8 @@ pre {
 }
 
 .nav-actions {
-  gap: 10px;
-  font-size: 0.94rem;
+  gap: 12px;
+  font-size: 0.95rem;
 }
 
 .button {
@@ -191,27 +181,15 @@ pre {
   padding: 0 18px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  font-weight: 750;
+  font-weight: 760;
   text-decoration: none;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
-}
-
-.button:hover {
-  transform: translateY(-1px);
+  background: var(--surface);
 }
 
 .button.dark {
-  border-color: #0f172a;
+  border-color: var(--text);
   color: #ffffff;
-  background: #0f172a;
-}
-
-.button.light {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--text);
 }
 
 .button.small {
@@ -221,14 +199,8 @@ pre {
 
 .hero {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 36px;
-  align-items: start;
-  padding: clamp(56px, 8vw, 92px) 0 38px;
-}
-
-.hero-copy {
-  min-width: 0;
+  gap: 38px;
+  padding: clamp(58px, 8vw, 96px) 0 38px;
 }
 
 .eyebrow {
@@ -241,10 +213,10 @@ pre {
 }
 
 .lead {
-  max-width: 690px;
+  max-width: 720px;
   margin-bottom: 0;
-  color: var(--muted-strong);
-  font-size: 1.08rem;
+  color: #475467;
+  font-size: 1.1rem;
 }
 
 .hero-actions {
@@ -256,16 +228,16 @@ pre {
 .hero-note {
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 24px;
+  margin-top: 22px;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.92rem;
 }
 
 .hero-note span {
   padding: 8px 11px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--surface);
 }
 
 .hero-note strong {
@@ -277,7 +249,8 @@ pre {
 .section,
 .security-note {
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.88);
+  border-radius: 24px;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -285,17 +258,7 @@ pre {
   display: grid;
   gap: 18px;
   width: min(100%, 860px);
-  min-width: 0;
-  margin-top: 4px;
   padding: clamp(20px, 3vw, 28px);
-  border-radius: 28px;
-}
-
-.card-header,
-.package-title,
-.report-grid,
-.finding-list article {
-  border-bottom: 1px solid var(--line);
 }
 
 .card-header {
@@ -304,13 +267,16 @@ pre {
   justify-content: space-between;
   gap: 16px;
   padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
 }
 
-.card-header > span {
+.card-header > span,
+.report-grid span,
+.command-card span {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 820;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -320,25 +286,23 @@ pre {
   align-items: center;
   padding: 7px 10px;
   border-radius: 999px;
+  color: var(--warning);
   font-size: 0.78rem;
-}
-
-.status.caution {
-  color: var(--yellow);
-  background: var(--yellow-soft);
+  background: var(--warning-soft);
 }
 
 .package-title {
   display: grid;
   gap: 5px;
   padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
 }
 
 .package-title span {
   overflow-wrap: anywhere;
-  font-size: clamp(1.65rem, 3.4vw, 2.15rem);
+  font-size: clamp(1.7rem, 4vw, 2.35rem);
   font-weight: 850;
-  letter-spacing: -0.055em;
+  letter-spacing: -0.045em;
 }
 
 .package-title small {
@@ -350,29 +314,15 @@ pre {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  padding-bottom: 18px;
 }
 
 .report-grid div {
   display: grid;
   gap: 7px;
-  min-width: 0;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--surface-muted);
-}
-
-.report-grid span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 820;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.report-grid strong {
-  font-size: 0.98rem;
+  background: var(--surface-soft);
 }
 
 .finding-list {
@@ -385,12 +335,9 @@ pre {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
   align-items: start;
-  padding-bottom: 12px;
-}
-
-.finding-list article:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
 }
 
 .finding-list article > span {
@@ -398,11 +345,11 @@ pre {
   align-items: center;
   padding: 5px 8px;
   border-radius: 999px;
-  color: var(--yellow);
+  color: var(--warning);
   font-size: 0.68rem;
   font-weight: 850;
   text-transform: uppercase;
-  background: var(--yellow-soft);
+  background: var(--warning-soft);
 }
 
 .finding-list strong {
@@ -418,18 +365,18 @@ pre {
 
 .product-card pre,
 .terminal {
-  border: 1px solid #1e293b;
+  border: 1px solid #1f2937;
   border-radius: 18px;
-  color: #dbeafe;
-  background: #0f172a;
+  color: #e5e7eb;
+  background: #111827;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .product-card pre {
   padding: 16px;
   font-size: 0.84rem;
   line-height: 1.65;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 .product-card pre code,
@@ -441,13 +388,12 @@ pre {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
-  border-radius: 22px;
 }
 
 .stats article {
   display: grid;
   gap: 7px;
-  min-height: 116px;
+  min-height: 112px;
   align-content: center;
   padding: 22px;
   border-right: 1px solid var(--line);
@@ -458,23 +404,22 @@ pre {
 }
 
 .stats strong {
-  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  font-size: clamp(1.75rem, 3vw, 2.45rem);
   line-height: 1;
-  letter-spacing: -0.055em;
+  letter-spacing: -0.045em;
 }
 
 .stats span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 780;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .section {
   margin-top: 28px;
   padding: clamp(30px, 5vw, 58px);
-  border-radius: 28px;
 }
 
 .two-column,
@@ -490,12 +435,6 @@ pre {
   margin-bottom: 28px;
 }
 
-.section-heading p:not(.eyebrow),
-.install-section p,
-.section-body p {
-  font-size: 1.03rem;
-}
-
 .section-body p:last-child {
   margin-bottom: 0;
 }
@@ -507,7 +446,9 @@ pre {
   gap: 14px;
 }
 
-.steps {
+.steps,
+.assurance-grid,
+.mini-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -516,13 +457,13 @@ pre {
 .mini-grid article {
   padding: 22px;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 18px;
   background: var(--surface);
 }
 
 .steps article > span {
   display: inline-flex;
-  margin-bottom: 42px;
+  margin-bottom: 38px;
   color: var(--accent);
   font-size: 0.75rem;
   font-weight: 850;
@@ -532,10 +473,6 @@ pre {
 .steps p,
 .assurance-grid p {
   margin-bottom: 0;
-}
-
-.demo-section {
-  background: #ffffff;
 }
 
 .demo-layout {
@@ -564,7 +501,6 @@ pre {
   padding: 14px 15px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  color: var(--text);
   text-align: left;
   cursor: pointer;
   background: var(--surface);
@@ -575,9 +511,10 @@ pre {
   background: #f0fdfa;
 }
 
-.demo-tab span {
+.demo-tab span,
+.mini-grid span {
   color: var(--muted);
-  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .terminal {
@@ -585,28 +522,12 @@ pre {
   padding: 22px;
   font-size: 0.88rem;
   line-height: 1.68;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 .demo-note {
   min-height: 44px;
   margin: 12px 0 0;
   font-size: 0.9rem;
-}
-
-.mini-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.mini-grid article {
-  display: grid;
-  gap: 6px;
-}
-
-.mini-grid span {
-  color: var(--muted);
-  line-height: 1.5;
 }
 
 .command-list {
@@ -625,14 +546,6 @@ pre {
   background: var(--surface);
 }
 
-.command-card span {
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 820;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .command-card code {
   overflow-wrap: anywhere;
   color: var(--text);
@@ -645,13 +558,8 @@ pre {
   padding: 7px 11px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  color: var(--text);
   cursor: pointer;
   background: #ffffff;
-}
-
-.assurance-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .security-note {
@@ -661,7 +569,6 @@ pre {
   align-items: start;
   margin-top: 28px;
   padding: 28px;
-  border-radius: 24px;
   background: #fff7ed;
 }
 
@@ -690,41 +597,27 @@ pre {
 }
 
 .footer a {
-  color: var(--muted-strong);
+  color: #475467;
+  text-decoration: none;
 }
 
 @media (max-width: 980px) {
-  .hero,
   .two-column,
-  .install-section {
-    grid-template-columns: 1fr;
-  }
-
-  .hero {
-    padding-top: 62px;
-  }
-
-  .product-card {
-    max-width: 720px;
-  }
-
+  .install-section,
   .steps,
-  .assurance-grid {
+  .assurance-grid,
+  .mini-grid {
     grid-template-columns: 1fr;
   }
 
   .steps article > span {
-    margin-bottom: 24px;
+    margin-bottom: 22px;
   }
 }
 
 @media (max-width: 760px) {
   .shell {
     width: min(100% - 24px, 1120px);
-  }
-
-  .site-header {
-    position: static;
   }
 
   .nav {
@@ -737,15 +630,15 @@ pre {
   }
 
   h1 {
-    font-size: clamp(2.75rem, 14vw, 4.5rem);
+    font-size: clamp(2.65rem, 13vw, 4.3rem);
   }
 
   h2 {
-    font-size: clamp(1.9rem, 10vw, 3rem);
+    font-size: clamp(1.9rem, 9vw, 3rem);
   }
 
   .hero {
-    padding-top: 50px;
+    padding-top: 48px;
   }
 
   .hero-note {
@@ -756,13 +649,12 @@ pre {
   .report-grid,
   .stats,
   .demo-layout,
-  .mini-grid,
   .security-note {
     grid-template-columns: 1fr;
   }
 
   .stats article {
-    min-height: 96px;
+    min-height: 94px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
