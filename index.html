@@ -15,13 +15,21 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
-    <meta name="twitter:card" content="summary" />
+    <meta
+      property="og:image"
+      content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/assets/npx-vibe-demo-poster.png"
+    />
+    <meta
+      property="og:image:alt"
+      content="npx-vibe reviewing the esbuild package before execution"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#ffffff" />
     <link rel="canonical" href="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://api.npmjs.org" crossorigin />
-    <link rel="stylesheet" href="./landing.css?v=professional-20260627" />
-    <script src="./app.js?v=professional-20260627" defer></script>
+    <link rel="stylesheet" href="./landing.css?v=demo-20260710" />
+    <script src="./app.js?v=demo-20260710" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -180,11 +188,42 @@ Action: review recommended before execution.</code></pre>
 
       <section id="demo" class="container section">
         <div class="section-heading">
-          <p class="badge">Terminal output</p>
-          <h2>Reports meant to be read quickly.</h2>
+          <p class="badge">Product walkthrough</p>
+          <h2>See the checkpoint in action.</h2>
           <p>
-            The CLI output is intentionally plain: package identity, context, findings, evidence, and action.
+            A real esbuild scan moves from package resolution to install-script evidence and an
+            optional AI interpretation&mdash;without executing package code.
           </p>
+        </div>
+
+        <figure class="demo-film">
+          <div class="demo-film-frame">
+            <picture>
+              <source
+                media="(prefers-reduced-motion: reduce)"
+                srcset="./assets/npx-vibe-demo-poster.png"
+              />
+              <img
+                src="./assets/npx-vibe-demo.gif"
+                width="1200"
+                height="675"
+                loading="lazy"
+                decoding="async"
+                alt="Animated npx-vibe scan of esbuild showing tarball verification, install-hook findings, optional Gemini review, and a Caution verdict"
+              />
+            </picture>
+          </div>
+          <figcaption>
+            <span><strong>Real scan shape.</strong> Heuristics, source evidence, and optional AI review.</span>
+            <span class="demo-film-meta">10-second walkthrough &middot; read-only</span>
+          </figcaption>
+        </figure>
+
+        <div class="demo-explorer-heading">
+          <div>
+            <h3>Compare complete verdicts</h3>
+            <p>Switch between representative Proceed, Caution, AI, and Block reports.</p>
+          </div>
         </div>
         <div class="demo-layout">
           <div class="demo-tabs" role="tablist" aria-label="Demo scenarios">
