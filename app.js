@@ -82,7 +82,7 @@ const demoMeta = {
 
 const output = document.querySelector("#demo-output");
 const note = document.querySelector("#demo-note");
-const tabs = document.querySelectorAll(".demo-tab");
+const tabs = [...document.querySelectorAll(".demo-tab")];
 
 function setDemo(name) {
   if (!output || !demos[name]) return;
@@ -99,6 +99,24 @@ function setDemo(name) {
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => setDemo(tab.dataset.demo));
+});
+
+tabs.forEach((tab, index) => {
+  tab.addEventListener("keydown", (event) => {
+    const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+
+    event.preventDefault();
+    let nextIndex = index;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = tabs.length - 1;
+
+    const nextTab = tabs[nextIndex];
+    setDemo(nextTab.dataset.demo);
+    nextTab.focus();
+  });
 });
 
 setDemo("proceed");

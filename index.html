@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>npx-vibe &mdash; check npm packages before execution</title>
+    <title>npx-vibe &mdash; inspect npm packages before they execute</title>
     <meta
       name="description"
-      content="npx-vibe checks npm packages before npx executes them. Deterministic by default, source-evidence first, with optional AI review."
+      content="npx-vibe is an evidence-first safety checkpoint for npm packages. Verify tarballs, inspect install behavior, and review source-backed findings before execution."
     />
-    <meta property="og:title" content="npx-vibe &mdash; check npm packages before execution" />
+    <meta property="og:title" content="Inspect npm packages before they execute" />
     <meta
       property="og:description"
-      content="A lightweight CLI checkpoint for npm packages: registry context, verified tarballs, install-hook inspection, evidence, and optional AI."
+      content="A lightweight, read-only checkpoint for npm packages with deterministic checks and optional AI review."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
@@ -24,180 +24,70 @@
       content="npx-vibe reviewing the esbuild package before execution"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#f4f7f6" />
     <link rel="canonical" href="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://api.npmjs.org" crossorigin />
-    <link rel="stylesheet" href="./landing.css?v=demo-20260710" />
-    <script src="./app.js?v=demo-20260710" defer></script>
+    <link rel="stylesheet" href="./landing.css?v=hero-20260711" />
+    <script src="./app.js?v=hero-20260711" defer></script>
   </head>
   <body>
     <header class="site-header">
       <nav class="container nav" aria-label="Primary navigation">
         <a class="brand" href="#top" aria-label="npx-vibe home">
-          <span class="brand-mark">nv</span>
+          <span class="brand-mark" aria-hidden="true">nv</span>
           <span>npx-vibe</span>
         </a>
+
         <div class="nav-links">
-          <a href="#features">Features</a>
-          <a href="#workflow">Workflow</a>
-          <a href="#demo">Demo</a>
-          <a href="#ai">AI</a>
-          <a href="#install">Install</a>
+          <a href="#workflow">How it works</a>
+          <a href="#evidence">Evidence</a>
+          <a href="#demo">Reports</a>
+          <a href="#ai">AI review</a>
         </div>
+
         <div class="nav-actions">
-          <a class="text-link" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
-          <a class="button button-dark button-small" href="https://www.npmjs.com/package/npx-vibe">npm package</a>
+          <a class="nav-github" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
+          <a class="button button-primary button-small" href="https://www.npmjs.com/package/npx-vibe">View on npm</a>
         </div>
       </nav>
     </header>
 
     <main id="top">
-      <section class="container hero">
-        <div class="hero-copy">
-          <p class="badge">Pre-execution safety for npm packages</p>
-          <h1>A practical safety check before running <code>npx</code>.</h1>
-          <p class="lead">
-            npx-vibe inspects npm packages before they execute. It verifies package metadata and
-            tarballs, reviews install-time behavior, and shows source-backed findings in a terminal
-            report developers can act on.
-          </p>
+      <section class="hero-shell">
+        <div class="container hero">
+          <div class="hero-copy">
+            <p class="eyebrow"><span></span> Evidence-first package checks</p>
+            <h1>Inspect packages before they execute.</h1>
+            <p class="hero-lead">
+              npx-vibe adds a practical safety pause before <code>npx</code>. It verifies the
+              tarball, inspects install-time behavior, and gives you the evidence behind every
+              Proceed, Caution, or Block verdict.
+            </p>
 
-          <div class="command-bar" aria-label="Primary install command">
-            <code>npx npx-vibe --check esbuild</code>
-            <button type="button" data-copy="npx npx-vibe --check esbuild">Copy</button>
-          </div>
+            <div class="command-bar" aria-label="Package check command">
+              <span aria-hidden="true">$</span>
+              <code>npx npx-vibe --check esbuild</code>
+              <button type="button" data-copy="npx npx-vibe --check esbuild">Copy</button>
+            </div>
 
-          <div class="hero-actions">
-            <a class="button button-dark" href="#install">Get started</a>
-            <a class="button button-light" href="#demo">View output</a>
-            <a class="button button-plain" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">Read on GitHub</a>
-          </div>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#install">Check a package</a>
+              <a class="button button-secondary" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">Read the source</a>
+            </div>
 
-          <div class="hero-meta" aria-label="Project signals">
-            <span><strong data-weekly-downloads>936</strong> weekly downloads</span>
-            <span>zero runtime dependencies</span>
-            <span>AI is opt-in</span>
-          </div>
-        </div>
-
-        <aside class="report-card" aria-label="Sample npx-vibe report">
-          <div class="report-top">
-            <span>Sample report</span>
-            <strong>Caution · 43/100</strong>
-          </div>
-          <div class="report-package">
-            <strong>esbuild@0.28.1</strong>
-            <span>Install hook found: <code>postinstall</code></span>
-          </div>
-          <div class="report-finding">
-            <span>MEDIUM</span>
-            <div>
-              <strong>network_and_shell in install.js</strong>
-              <p>Evidence lines combine network access with shell execution.</p>
+            <div class="hero-signals" aria-label="Product facts">
+              <span><strong>0</strong> runtime dependencies</span>
+              <span><strong>37</strong> automated checks</span>
+              <span><strong>Opt-in</strong> AI review</span>
             </div>
           </div>
-          <pre><code>$ npx npx-vibe --check esbuild
-! npx-vibe: Caution  risk 43/100
-AI review: skipped
-Action: review recommended before execution.</code></pre>
-        </aside>
-      </section>
 
-      <section class="container proof-strip" aria-label="Project facts">
-        <article>
-          <strong data-weekly-downloads>936</strong>
-          <span>weekly npm downloads</span>
-        </article>
-        <article>
-          <strong>37</strong>
-          <span>automated checks</span>
-        </article>
-        <article>
-          <strong>9</strong>
-          <span>CI targets</span>
-        </article>
-        <article>
-          <strong>0</strong>
-          <span>runtime dependencies</span>
-        </article>
-      </section>
-
-      <section id="features" class="container section">
-        <div class="section-heading">
-          <p class="badge">Designed like a developer tool</p>
-          <h2>Fast defaults, readable evidence, clear boundaries.</h2>
-          <p>
-            The goal is not to replace audits or sandboxing. The goal is to add a useful checkpoint
-            before a package reaches install scripts or executable code.
-          </p>
-        </div>
-        <div class="feature-grid">
-          <article>
-            <h3>Heuristic by default</h3>
-            <p>Runs without API keys and ignores ambient provider credentials unless AI is explicitly requested.</p>
-          </article>
-          <article>
-            <h3>Source evidence</h3>
-            <p>Findings point to files, lifecycle hooks, and line-level excerpts instead of vague warnings.</p>
-          </article>
-          <article>
-            <h3>Package context</h3>
-            <p>Shows age, downloads, maintainers, publisher, repository, and install-hook metadata.</p>
-          </article>
-          <article>
-            <h3>Review memory</h3>
-            <p>Recognizes unchanged package integrity and helps compare what changed between versions.</p>
-          </article>
-        </div>
-      </section>
-
-      <section id="workflow" class="container section split">
-        <div>
-          <p class="badge">Workflow</p>
-          <h2>One command, three checks.</h2>
-          <p>
-            npx-vibe keeps the flow close to how developers already work: run a command, read the
-            evidence, decide whether to continue.
-          </p>
-        </div>
-        <ol class="steps">
-          <li>
-            <span>01</span>
-            <div>
-              <h3>Resolve and verify</h3>
-              <p>Fetch npm metadata, resolve the exact package version, and verify the downloaded tarball.</p>
+          <figure class="hero-demo">
+            <div class="hero-demo-label">
+              <span><i></i> Real package scan</span>
+              <span>read-only</span>
             </div>
-          </li>
-          <li>
-            <span>02</span>
-            <div>
-              <h3>Inspect install behavior</h3>
-              <p>Review lifecycle scripts and selected files for shell, network, secrets, and obfuscation signals.</p>
-            </div>
-          </li>
-          <li>
-            <span>03</span>
-            <div>
-              <h3>Print a decision report</h3>
-              <p>Return Proceed, Caution, or Block with the concrete evidence behind the recommendation.</p>
-            </div>
-          </li>
-        </ol>
-      </section>
-
-      <section id="demo" class="container section">
-        <div class="section-heading">
-          <p class="badge">Product walkthrough</p>
-          <h2>See the checkpoint in action.</h2>
-          <p>
-            A real esbuild scan moves from package resolution to install-script evidence and an
-            optional AI interpretation&mdash;without executing package code.
-          </p>
-        </div>
-
-        <figure class="demo-film">
-          <div class="demo-film-frame">
             <picture>
               <source
                 media="(prefers-reduced-motion: reduce)"
@@ -207,106 +97,210 @@ Action: review recommended before execution.</code></pre>
                 src="./assets/npx-vibe-demo.gif"
                 width="1200"
                 height="675"
-                loading="lazy"
+                fetchpriority="high"
                 decoding="async"
-                alt="Animated npx-vibe scan of esbuild showing tarball verification, install-hook findings, optional Gemini review, and a Caution verdict"
+                alt="Animated npx-vibe scan of esbuild showing tarball verification, install-hook evidence, optional Gemini review, and a Caution verdict"
               />
             </picture>
-          </div>
-          <figcaption>
-            <span><strong>Real scan shape.</strong> Heuristics, source evidence, and optional AI review.</span>
-            <span class="demo-film-meta">10-second walkthrough &middot; read-only</span>
-          </figcaption>
-        </figure>
+            <figcaption>
+              <span>esbuild@0.28.1</span>
+              <strong>Caution &middot; 43/100</strong>
+            </figcaption>
+          </figure>
+        </div>
 
-        <div class="demo-explorer-heading">
+        <div class="container proof-bar" aria-label="Project credibility">
           <div>
-            <h3>Compare complete verdicts</h3>
-            <p>Switch between representative Proceed, Caution, AI, and Block reports.</p>
+            <strong data-weekly-downloads>Live</strong>
+            <span>weekly npm downloads</span>
+          </div>
+          <div>
+            <strong>MIT</strong>
+            <span>open-source license</span>
+          </div>
+          <div>
+            <strong>Node 20+</strong>
+            <span>cross-platform CLI</span>
+          </div>
+          <div>
+            <strong>9 targets</strong>
+            <span>Linux, macOS, Windows CI</span>
           </div>
         </div>
-        <div class="demo-layout">
+      </section>
+
+      <section id="workflow" class="container content-section workflow-section">
+        <div class="section-intro">
+          <p class="eyebrow">A deliberate checkpoint</p>
+          <h2>One command between discovery and execution.</h2>
+          <p>
+            The default path is deterministic, local, and key-free. Package code is not executed
+            during the review.
+          </p>
+        </div>
+
+        <ol class="workflow-grid">
+          <li>
+            <span>01</span>
+            <h3>Resolve</h3>
+            <p>Pin the requested package to an exact npm version and collect registry context.</p>
+          </li>
+          <li>
+            <span>02</span>
+            <h3>Verify</h3>
+            <p>Download without execution and verify the tarball against npm integrity metadata.</p>
+          </li>
+          <li>
+            <span>03</span>
+            <h3>Inspect</h3>
+            <p>Review lifecycle hooks and selected source for secrets, network, shell, and obfuscation signals.</p>
+          </li>
+          <li>
+            <span>04</span>
+            <h3>Decide</h3>
+            <p>Read a source-backed verdict, then choose whether the package should execute.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section id="evidence" class="evidence-shell">
+        <div class="container evidence-layout">
+          <div class="evidence-copy">
+            <p class="eyebrow">Explainable by design</p>
+            <h2>A verdict you can audit.</h2>
+            <p>
+              Risk scores are useful only when you can inspect what produced them. npx-vibe keeps
+              popularity signals, source findings, and model interpretation clearly separated.
+            </p>
+            <a class="inline-link" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check#evidence-not-mystery-scores">See how scoring works <span>&rarr;</span></a>
+          </div>
+
+          <div class="evidence-grid">
+            <article>
+              <span class="feature-index">01</span>
+              <h3>Line-level evidence</h3>
+              <p>Findings name the file, matched behavior, and bounded source excerpt.</p>
+            </article>
+            <article>
+              <span class="feature-index">02</span>
+              <h3>Registry context</h3>
+              <p>Age, maintainers, downloads, repository activity, and install hooks stay visible.</p>
+            </article>
+            <article>
+              <span class="feature-index">03</span>
+              <h3>Review memory</h3>
+              <p>Integrity-keyed history shows whether selected code changed between versions.</p>
+            </article>
+            <article>
+              <span class="feature-index">04</span>
+              <h3>Safe execution defaults</h3>
+              <p>Execution uses ignored install scripts unless reviewed scripts are intentionally allowed.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="demo" class="container content-section reports-section">
+        <div class="reports-heading">
+          <div>
+            <p class="eyebrow">Representative output</p>
+            <h2>Read the evidence, not a black box.</h2>
+          </div>
+          <p>Compare the report shape for clean packages, install hooks, optional AI, and synthetic malicious behavior.</p>
+        </div>
+
+        <div class="report-explorer">
           <div class="demo-tabs" role="tablist" aria-label="Demo scenarios">
-            <button class="demo-tab active" type="button" data-demo="proceed">Proceed <span>clean package</span></button>
-            <button class="demo-tab" type="button" data-demo="caution">Caution <span>install hook</span></button>
-            <button class="demo-tab" type="button" data-demo="ai">AI review <span>optional</span></button>
-            <button class="demo-tab" type="button" data-demo="block">Block <span>synthetic fixture</span></button>
+            <button class="demo-tab active" type="button" role="tab" aria-selected="true" aria-controls="demo-panel" data-demo="proceed">
+              <span>Proceed</span><small>clean package</small>
+            </button>
+            <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo="caution">
+              <span>Caution</span><small>install hook</small>
+            </button>
+            <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo="ai">
+              <span>AI review</span><small>optional context</small>
+            </button>
+            <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo="block">
+              <span>Block</span><small>synthetic fixture</small>
+            </button>
           </div>
-          <div>
+          <div id="demo-panel" class="terminal-panel" role="tabpanel">
+            <div class="terminal-titlebar">
+              <span class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span>npx-vibe report</span>
+              <span>read-only</span>
+            </div>
             <pre class="terminal"><code id="demo-output"></code></pre>
-            <p class="demo-note" id="demo-note"></p>
+            <p class="demo-note" id="demo-note" aria-live="polite"></p>
           </div>
         </div>
       </section>
 
-      <section id="ai" class="container section split">
-        <div>
-          <p class="badge">Optional AI</p>
-          <h2>Model review is explicit, not automatic.</h2>
-          <p>
-            Online or local AI can help interpret suspicious install scripts, but the deterministic
-            scan remains the baseline. Provider and model names are printed in the output.
-          </p>
-        </div>
-        <div class="info-grid">
-          <article>
-            <h3>Local</h3>
-            <p>Use Ollama when you want package review to stay on your machine.</p>
-          </article>
-          <article>
-            <h3>Online</h3>
-            <p>Use provider-specific keys for OpenAI, Gemini, Anthropic, OpenRouter, Groq, and more.</p>
-          </article>
-          <article>
-            <h3>Profiles</h3>
-            <p>Choose fast, balanced, or strong model profiles without memorizing model names.</p>
-          </article>
-        </div>
-      </section>
+      <section id="ai" class="ai-shell">
+        <div class="container ai-layout">
+          <div>
+            <p class="eyebrow eyebrow-light">Optional AI review</p>
+            <h2>Use a model when interpretation adds value.</h2>
+            <p>
+              Heuristics remain the baseline. When a package triggers review, choose local Ollama
+              or an online provider and keep the resolved provider and model visible in the result.
+            </p>
+            <div class="ai-actions">
+              <a class="button button-light" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check#ai-is-optional-and-opt-in">Provider setup</a>
+              <code>--ai online --provider gemini</code>
+            </div>
+          </div>
 
-      <section id="install" class="container section install-section">
-        <div>
-          <p class="badge">Install</p>
-          <h2>Start with a read-only check.</h2>
-          <p>
-            The default command inspects the package before execution. Use it when a package is new,
-            unfamiliar, or has install-time behavior you want to understand.
-          </p>
-        </div>
-        <div class="command-list">
-          <div class="copy-command">
-            <span>Check a package</span>
-            <code>npx npx-vibe --check esbuild</code>
-            <button type="button" data-copy="npx npx-vibe --check esbuild">Copy</button>
-          </div>
-          <div class="copy-command">
-            <span>Install globally</span>
-            <code>npm install -g npx-vibe</code>
-            <button type="button" data-copy="npm install -g npx-vibe">Copy</button>
-          </div>
-          <div class="copy-command">
-            <span>Optional Gemini review</span>
-            <code>npx npx-vibe --ai online --provider gemini esbuild</code>
-            <button type="button" data-copy="npx npx-vibe --ai online --provider gemini esbuild">Copy</button>
+          <div class="ai-flow" aria-label="AI privacy flow">
+            <div><span>01</span><strong>Selected npm files</strong><small>not your local project</small></div>
+            <div><span>02</span><strong>Your chosen model</strong><small>local or online</small></div>
+            <div><span>03</span><strong>Evidence-matched result</strong><small>provider and model shown</small></div>
           </div>
         </div>
       </section>
 
-      <section class="container boundary">
+      <section id="install" class="container content-section install-section">
+        <div class="install-card">
+          <div>
+            <p class="eyebrow">Start with a read-only check</p>
+            <h2>Add one safety pause to your next <code>npx</code> command.</h2>
+            <p>No account, API key, or global installation is required for the default scan.</p>
+          </div>
+
+          <div class="install-commands">
+            <div class="copy-command">
+              <span>Check a package</span>
+              <code>npx npx-vibe --check &lt;package&gt;</code>
+              <button type="button" data-copy="npx npx-vibe --check <package>">Copy</button>
+            </div>
+            <div class="copy-command">
+              <span>Install globally</span>
+              <code>npm install -g npx-vibe</code>
+              <button type="button" data-copy="npm install -g npx-vibe">Copy</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="container security-note">
         <strong>Security boundary</strong>
         <p>
-          npx-vibe is a pre-execution scanner. It is not a sandbox, antivirus product, or formal
-          audit. It helps surface risky signals before execution, but it cannot prove a package is safe.
+          npx-vibe is a pre-execution scanner, not a sandbox, antivirus product, or formal audit.
+          It surfaces risky signals and supporting evidence; it cannot prove that a package is safe.
         </p>
       </section>
     </main>
 
     <footer class="container footer">
-      <p>Built for developers who want fast tools with inspectable decisions.</p>
-      <div>
+      <div class="footer-brand">
+        <span class="brand-mark" aria-hidden="true">nv</span>
+        <div><strong>npx-vibe</strong><small>Inspect first. Execute deliberately.</small></div>
+      </div>
+      <div class="footer-links">
         <a href="https://www.npmjs.com/package/npx-vibe">npm</a>
         <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
         <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/SECURITY.md">Security</a>
+        <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/CHANGELOG.md">Changelog</a>
       </div>
     </footer>
   </body>
