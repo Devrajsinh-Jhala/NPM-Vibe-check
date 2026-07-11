@@ -2,6 +2,12 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## Unreleased
+
+### Added
+
+- `--bin <name>` selects a specific executable from packages that expose multiple binaries, with actionable validation when the name is unavailable.
+
 ## 1.2.0 - 2026-06-25
 
 ### Added

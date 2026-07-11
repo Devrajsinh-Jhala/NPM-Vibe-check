@@ -171,6 +171,9 @@ npx npx-vibe --json <package>
 # Review, then execute when permitted
 npx npx-vibe <package> -- <arguments>
 
+# Select one executable from a package with multiple binaries
+npx npx-vibe --bin tsc typescript -- --version
+
 # Execute a Caution verdict without prompting
 npx npx-vibe --yes <package>
 
@@ -185,6 +188,7 @@ Useful options:
 --json
 --yes, -y
 --force
+--bin <name>
 --ai off|auto|online|ollama
 --provider auto|openai|anthropic|gemini|openrouter|groq|together|custom
 --models

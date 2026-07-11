@@ -53,3 +53,28 @@ test("findBinCommand picks obvious bin names", () => {
   assert.equal(findBinCommand({ bin: { tool: "cli.js", other: "other.js" } }, { name: "tool", unscopedName: "tool" }), "tool");
   assert.equal(findBinCommand({ bin: { only: "cli.js" } }, { name: "pkg", unscopedName: "pkg" }), "only");
 });
+
+test("--bin selects a named executable from multi-bin packages", () => {
+  const args = parseArgs(["--bin", "tsc", "typescript", "--", "--version"], {});
+  assert.equal(args.bin, "tsc");
+  assert.deepEqual(args.packageArgs, ["--version"]);
+  assert.equal(
+    findBinCommand(
+      { bin: { tsc: "bin/tsc", tsserver: "bin/tsserver" } },
+      { name: "typescript", unscopedName: "typescript" },
+      args.bin,
+    ),
+    "tsc",
+  );
+});
+
+test("--bin reports the executable names available from a package", () => {
+  assert.throws(
+    () => findBinCommand(
+      { bin: { tsc: "bin/tsc", tsserver: "bin/tsserver" } },
+      { name: "typescript", unscopedName: "typescript" },
+      "missing",
+    ),
+    /Available binaries: tsc, tsserver/,
+  );
+});

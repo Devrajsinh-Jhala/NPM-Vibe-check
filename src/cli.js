@@ -103,7 +103,7 @@ export async function reviewPackage(packageSpecInput, config = {}) {
   }
 
   const verdict = decideVerdict(analysis, aiReview, config);
-  const binInfo = safeFindBinCommand(analysis.manifest, spec);
+  const binInfo = safeFindBinCommand(analysis.manifest, spec, config.bin);
 
   const result = {
     package: {
@@ -181,6 +181,7 @@ export function parseArgs(argv, env = process.env) {
     historyEnabled: env.NPX_VIBE_HISTORY !== "off",
     historyFile: env.NPX_VIBE_HISTORY_FILE,
     npmBin: env.NPX_VIBE_NPM_BIN,
+    bin: env.NPX_VIBE_BIN,
     check: false,
     json: false,
     models: false,
@@ -284,6 +285,14 @@ export function parseArgs(argv, env = process.env) {
         case "--registry":
           config.registry = readValue();
           break;
+        case "--bin": {
+          const bin = readValue().trim();
+          if (!bin) {
+            throw new Error("--bin must name a package executable.");
+          }
+          config.bin = bin;
+          break;
+        }
         case "--age-days":
           config.ageDays = numberFlag(parsed.name, readValue());
           break;
@@ -363,7 +372,7 @@ async function confirmExecution(result, config) {
 
 export function executePackage(snapshot, manifest, packageArgs, config) {
   const spec = snapshot.spec;
-  const binCommand = findBinCommand(manifest, spec);
+  const binCommand = findBinCommand(manifest, spec, config.bin);
   const npmPackage = `${spec.name}@${snapshot.version}`;
   const npmBin = config.npmBin ?? (process.platform === "win32" ? "npm.cmd" : "npm");
   const npmArgs = ["exec", "--yes", "--package", npmPackage];
@@ -394,22 +403,32 @@ export function executePackage(snapshot, manifest, packageArgs, config) {
   });
 }
 
-function safeFindBinCommand(manifest, spec) {
+function safeFindBinCommand(manifest, spec, preferredBin) {
   try {
-    return { command: findBinCommand(manifest, spec), error: null };
+    return { command: findBinCommand(manifest, spec, preferredBin), error: null };
   } catch (error) {
     return { command: null, error: error.message };
   }
 }
 
-export function findBinCommand(manifest, spec) {
+export function findBinCommand(manifest, spec, preferredBin) {
   const bin = manifest?.bin;
   if (typeof bin === "string") {
-    return spec.unscopedName;
+    const command = spec.unscopedName;
+    if (preferredBin && preferredBin !== command) {
+      throw new Error(`${spec.name} exposes the executable ${command}, not ${preferredBin}.`);
+    }
+    return command;
   }
 
   if (bin && typeof bin === "object" && !Array.isArray(bin)) {
     const names = Object.keys(bin);
+    if (preferredBin) {
+      if (Object.hasOwn(bin, preferredBin)) {
+        return preferredBin;
+      }
+      throw new Error(`${spec.name} does not expose ${preferredBin}. Available binaries: ${names.join(", ")}.`);
+    }
     if (names.includes(spec.unscopedName)) {
       return spec.unscopedName;
     }
@@ -419,7 +438,7 @@ export function findBinCommand(manifest, spec) {
     if (names.length === 1) {
       return names[0];
     }
-    throw new Error(`Package declares multiple binaries (${names.join(", ")}). Pass the desired binary after npm installs are supported in a future version.`);
+    throw new Error(`Package declares multiple binaries (${names.join(", ")}). Use --bin <name> to select one.`);
   }
 
   throw new Error(`${spec.name}@${manifest?.version ?? "unknown"} does not declare a binary entrypoint.`);
@@ -489,6 +508,7 @@ Examples:
   npx-vibe cowsay -- hello
   npx-vibe --check obscure-package
   npx-vibe --json obscure-package
+  npx-vibe --bin tsc typescript -- --version
   npx-vibe --models
   npx-vibe --provider gemini --api-key ... obscure-package
   OPENAI_API_KEY=... npx-vibe --ai online obscure-package
@@ -512,6 +532,7 @@ Options:
   --ollama-url <url>         Default: http://127.0.0.1:11434
   --ollama-model <name>      Default: qwen2.5-coder
   --registry <url>           Default: https://registry.npmjs.org
+  --bin <name>               Select an executable when a package exposes multiple binaries
   --age-days <days>          Young package threshold; default 14
   --downloads <count>        Low weekly downloads threshold; default 1000
   --caution-score <0-100>    Default 40
