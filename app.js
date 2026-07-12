@@ -83,12 +83,20 @@ const demoMeta = {
 const output = document.querySelector("#demo-output");
 const note = document.querySelector("#demo-note");
 const tabs = [...document.querySelectorAll(".demo-tab")];
+const terminalPanel = document.querySelector(".terminal-panel");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function setDemo(name) {
   if (!output || !demos[name]) return;
 
   output.textContent = demos[name];
   if (note) note.textContent = demoMeta[name];
+
+  if (terminalPanel && !reduceMotion) {
+    terminalPanel.classList.remove("is-switching");
+    void terminalPanel.offsetWidth;
+    terminalPanel.classList.add("is-switching");
+  }
 
   tabs.forEach((tab) => {
     const active = tab.dataset.demo === name;
@@ -121,6 +129,34 @@ tabs.forEach((tab, index) => {
 
 setDemo("proceed");
 
+const siteHeader = document.querySelector(".site-header");
+
+function updateHeader() {
+  siteHeader?.classList.toggle("is-scrolled", window.scrollY > 12);
+}
+
+updateHeader();
+window.addEventListener("scroll", updateHeader, { passive: true });
+
+const revealItems = [...document.querySelectorAll("[data-reveal]")];
+
+if (reduceMotion || !("IntersectionObserver" in window)) {
+  revealItems.forEach((item) => item.classList.add("is-visible"));
+} else {
+  const revealObserver = new IntersectionObserver(
+    (entries, observer) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      });
+    },
+    { rootMargin: "0px 0px -10% 0px", threshold: 0.08 },
+  );
+
+  revealItems.forEach((item) => revealObserver.observe(item));
+}
+
 document.querySelectorAll("[data-copy]").forEach((button) => {
   const defaultText = button.textContent;
 
@@ -140,6 +176,24 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
 
 const DOWNLOAD_API = "https://api.npmjs.org/downloads/range/last-week/npx-vibe";
 const numberFormatter = new Intl.NumberFormat("en-US");
+
+function animateNumber(element, total) {
+  if (reduceMotion) {
+    element.textContent = numberFormatter.format(total);
+    return;
+  }
+
+  const duration = 700;
+  const startedAt = performance.now();
+  const step = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - (1 - progress) ** 3;
+    element.textContent = numberFormatter.format(Math.round(total * eased));
+    if (progress < 1) requestAnimationFrame(step);
+  };
+
+  requestAnimationFrame(step);
+}
 
 async function refreshDownloads() {
   const controller = new AbortController();
@@ -161,7 +215,7 @@ async function refreshDownloads() {
     if (!total) return;
 
     document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
-      element.textContent = numberFormatter.format(total);
+      animateNumber(element, total);
       element.setAttribute(
         "title",
         `${numberFormatter.format(total)} downloads from ${payload.start} through ${payload.end}`
