@@ -28,8 +28,9 @@
     <link rel="canonical" href="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://api.npmjs.org" crossorigin />
-    <link rel="stylesheet" href="./landing.css?v=hero-20260711" />
-    <script src="./app.js?v=hero-20260711" defer></script>
+    <script>document.documentElement.classList.add("js");</script>
+    <link rel="stylesheet" href="./landing.css?v=motion-20260712" />
+    <script src="./app.js?v=motion-20260712" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -58,7 +59,7 @@
         <div class="container hero">
           <div class="hero-copy">
             <p class="eyebrow"><span></span> Evidence-first package checks</p>
-            <h1>Inspect packages before they execute.</h1>
+            <h1>Inspect before you execute.</h1>
             <p class="hero-lead">
               npx-vibe adds a practical safety pause before <code>npx</code>. It verifies the
               tarball, inspects install-time behavior, and gives you the evidence behind every
@@ -130,7 +131,7 @@
       </section>
 
       <section id="workflow" class="container content-section workflow-section">
-        <div class="section-intro">
+        <div class="section-intro" data-reveal>
           <p class="eyebrow">A deliberate checkpoint</p>
           <h2>One command between discovery and execution.</h2>
           <p>
@@ -139,7 +140,7 @@
           </p>
         </div>
 
-        <ol class="workflow-grid">
+        <ol class="workflow-grid" data-reveal>
           <li>
             <span>01</span>
             <h3>Resolve</h3>
@@ -165,7 +166,7 @@
 
       <section id="evidence" class="evidence-shell">
         <div class="container evidence-layout">
-          <div class="evidence-copy">
+          <div class="evidence-copy" data-reveal>
             <p class="eyebrow">Explainable by design</p>
             <h2>A verdict you can audit.</h2>
             <p>
@@ -175,7 +176,7 @@
             <a class="inline-link" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check#evidence-not-mystery-scores">See how scoring works <span>&rarr;</span></a>
           </div>
 
-          <div class="evidence-grid">
+          <div class="evidence-grid" data-reveal>
             <article>
               <span class="feature-index">01</span>
               <h3>Line-level evidence</h3>
@@ -201,7 +202,7 @@
       </section>
 
       <section id="demo" class="container content-section reports-section">
-        <div class="reports-heading">
+        <div class="reports-heading" data-reveal>
           <div>
             <p class="eyebrow">Representative output</p>
             <h2>Read the evidence, not a black box.</h2>
@@ -209,7 +210,7 @@
           <p>Compare the report shape for clean packages, install hooks, optional AI, and synthetic malicious behavior.</p>
         </div>
 
-        <div class="report-explorer">
+        <div class="report-explorer" data-reveal>
           <div class="demo-tabs" role="tablist" aria-label="Demo scenarios">
             <button class="demo-tab active" type="button" role="tab" aria-selected="true" aria-controls="demo-panel" data-demo="proceed">
               <span>Proceed</span><small>clean package</small>
@@ -238,7 +239,7 @@
 
       <section id="ai" class="ai-shell">
         <div class="container ai-layout">
-          <div>
+          <div data-reveal>
             <p class="eyebrow eyebrow-light">Optional AI review</p>
             <h2>Use a model when interpretation adds value.</h2>
             <p>
@@ -251,7 +252,7 @@
             </div>
           </div>
 
-          <div class="ai-flow" aria-label="AI privacy flow">
+          <div class="ai-flow" aria-label="AI privacy flow" data-reveal>
             <div><span>01</span><strong>Selected npm files</strong><small>not your local project</small></div>
             <div><span>02</span><strong>Your chosen model</strong><small>local or online</small></div>
             <div><span>03</span><strong>Evidence-matched result</strong><small>provider and model shown</small></div>
@@ -260,7 +261,7 @@
       </section>
 
       <section id="install" class="container content-section install-section">
-        <div class="install-card">
+        <div class="install-card" data-reveal>
           <div>
             <p class="eyebrow">Start with a read-only check</p>
             <h2>Add one safety pause to your next <code>npx</code> command.</h2>
@@ -282,7 +283,7 @@
         </div>
       </section>
 
-      <section class="container security-note">
+      <section class="container security-note" data-reveal>
         <strong>Security boundary</strong>
         <p>
           npx-vibe is a pre-execution scanner, not a sandbox, antivirus product, or formal audit.
