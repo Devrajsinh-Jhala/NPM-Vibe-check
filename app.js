@@ -61,7 +61,7 @@ Action: review recommended before execution.`,
   agent: `$ npx --yes npx-vibe@latest --agent esbuild
 {
   "schemaVersion": 1,
-  "tool": { "name": "npx-vibe", "version": "1.5.0" },
+  "tool": { "name": "npx-vibe", "version": "1.5.1" },
   "kind": "package-scan",
   "status": "complete",
   "decision": {
