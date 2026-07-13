@@ -2,7 +2,7 @@
 
 > Evidence-first npm package and project dependency checks before code executes.
 
-npx-vibe is a zero-runtime-dependency Node.js CLI that resolves public npm packages, downloads and verifies registry tarballs without executing package code, inspects install-time behavior, and reports Proceed, Caution, or Block with source evidence.
+npx-vibe is a zero-runtime-dependency Node.js CLI and MCP server that resolves public npm packages, downloads and verifies registry tarballs without executing package code, inspects install-time behavior, and reports Proceed, Caution, or Block with source evidence.
 
 ## Canonical links
 
@@ -25,6 +25,24 @@ Inspect direct registry dependencies in the current project:
 Install the portable Agent Skill:
 
     npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g
+
+## MCP server
+
+Start the local stdio server:
+
+    npx --yes npx-vibe@latest --mcp
+
+Dedicated global binary:
+
+    npx-vibe-mcp
+
+Tools:
+
+- scan_package: inspect one public npm package
+- scan_project: inspect direct registry dependencies in a project
+- list_models: inspect bundled provider/model recommendations
+
+MCP scan results return the same schemaVersion 1 decision envelope in structuredContent and a JSON text block. Tools are read-only and do not accept API keys as arguments. AI is off by default; credentials must be configured in the MCP server environment. MCP Registry identifier: io.github.devrajsinh-jhala/npx-vibe.
 
 ## Decision contract
 
