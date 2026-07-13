@@ -2,6 +2,22 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 1.5.0 - 2026-07-13
+
+### Added
+
+- A zero-runtime-dependency MCP server over stdio, available through `npx-vibe --mcp` and the dedicated `npx-vibe-mcp` binary.
+- Schema-backed `scan_package`, `scan_project`, and `list_models` MCP tools with read-only annotations and structured output.
+- Fail-closed MCP errors, bounded message handling, credential-safe AI opt-in, and compatibility with stable MCP protocol revisions through `2025-11-25`.
+- MCP Registry-ready `server.json` metadata and the matching npm `mcpName` package identifier.
+- Packed-artifact smoke coverage for MCP initialization and tool discovery.
+
+### Changed
+
+- The portable Agent Skill now prefers native MCP tools when connected and keeps the versioned `--agent` CLI as a fallback.
+- Documentation and the landing page now explain both the Agent Skill and MCP integration paths.
+- The automated test suite now covers 63 package, project, provider, output, history, agent-contract, and MCP behaviors.
+
 ## 1.4.0 - 2026-07-13
 
 ### Added

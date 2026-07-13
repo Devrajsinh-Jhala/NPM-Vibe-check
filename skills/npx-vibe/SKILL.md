@@ -1,13 +1,25 @@
 ---
 name: npx-vibe
-description: Run read-only npm package safety preflights before an agent installs, adds, executes, or recommends unfamiliar registry packages. Use for npx or npm exec commands, dependency additions, package-lock changes, and project dependency reviews.
+description: Run read-only npm package safety preflights through MCP or the CLI before an agent installs, adds, executes, or recommends unfamiliar registry packages. Use for npx or npm exec commands, dependency additions, package-lock changes, and project dependency reviews.
 ---
 
 # npx-vibe Package Preflight
 
 Inspect npm registry packages before allowing installation or execution. Treat the result as a review aid, fail closed on incomplete scans, and preserve the user's authority over risky actions.
 
-## Run the preflight
+## Prefer the MCP tools
+
+When the `npx-vibe` MCP server is connected, use its native tools instead of launching a shell command:
+
+- `scan_package` for one npm package spec.
+- `scan_project` for direct registry dependencies from a project manifest.
+- `list_models` before selecting an optional AI model.
+
+Keep AI off unless the user explicitly asks for it or an established workflow requires it. MCP tool calls never accept API keys; provider credentials must come from the server environment.
+
+## Fall back to the CLI
+
+Use the CLI when the MCP server is unavailable.
 
 For one package:
 
@@ -25,14 +37,14 @@ Add `--include-dev` only when development dependencies are in scope. The outer `
 
 ## Apply the decision
 
-Parse stdout as JSON and use `decision.action`:
+Read `structuredContent` from an MCP result, or parse CLI stdout as JSON, and use `decision.action`:
 
 - `continue`: Continue only with the install or execution the user already requested.
 - `review`: Stop before execution, summarize the highest-severity findings and evidence, and request explicit human approval.
 - `stop`: Do not install or execute the package. Explain the Block verdict and source evidence.
 - `retry`: Treat the scan as incomplete. Report the operational error and do not infer safety from partial results.
 
-Also require `schemaVersion === 1`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically.
+Also require `schemaVersion === 1`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. An MCP result with `isError: true` is incomplete and must be treated as `retry`, even when partial details are present.
 
 ## Use AI only when requested
 

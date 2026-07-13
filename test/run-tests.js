@@ -6,3 +6,4 @@ await import("./output.test.js");
 await import("./history.test.js");
 await import("./project.test.js");
 await import("./agent.test.js");
+await import("./mcp.test.js");

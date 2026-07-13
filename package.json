@@ -1,7 +1,8 @@
 {
   "name": "npx-vibe",
-  "version": "1.4.0",
-  "description": "Evidence-first npm package and project dependency checks for developers and coding agents before code executes.",
+  "version": "1.5.0",
+  "description": "Evidence-first npm package and project dependency checks for developers, coding agents, and MCP clients before code executes.",
+  "mcpName": "io.github.devrajsinh-jhala/npx-vibe",
   "type": "module",
   "homepage": "https://devrajsinh-jhala.github.io/NPM-Vibe-check/",
   "repository": {
@@ -12,12 +13,14 @@
     "url": "https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/issues"
   },
   "bin": {
-    "npx-vibe": "bin/npx-vibe.js"
+    "npx-vibe": "bin/npx-vibe.js",
+    "npx-vibe-mcp": "bin/npx-vibe-mcp.js"
   },
   "files": [
     "bin",
     "src",
     "skills",
+    "server.json",
     "README.md"
   ],
   "scripts": {
@@ -46,7 +49,10 @@
     "npm-security",
     "agent-skills",
     "coding-agents",
-    "agent-tools"
+    "agent-tools",
+    "mcp",
+    "model-context-protocol",
+    "mcp-server"
   ],
   "license": "MIT",
   "author": "Devrajsinh Jhala",

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.devrajsinh-jhala/npx-vibe",
+  "title": "npx-vibe",
+  "description": "Read-only npm package and project dependency preflight tools for AI applications.",
+  "websiteUrl": "https://devrajsinh-jhala.github.io/NPM-Vibe-check/",
+  "repository": {
+    "url": "https://github.com/Devrajsinh-Jhala/NPM-Vibe-check",
+    "source": "github"
+  },
+  "version": "1.5.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "npx-vibe",
+      "version": "1.5.0",
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "--mcp"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

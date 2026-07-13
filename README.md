@@ -7,11 +7,11 @@
 [![Node.js](https://img.shields.io/node/v/npx-vibe.svg)](https://www.npmjs.com/package/npx-vibe)
 [![License: MIT](https://img.shields.io/npm/l/npx-vibe.svg)](./LICENSE)
 
-**Evidence-first safety checks for npm packages and project dependencies before code executes.**
+**Evidence-first safety checks for npm packages and project dependencies before developers, coding agents, or MCP clients execute them.**
 
 `npx-vibe` resolves packages from the public npm registry, downloads and verifies their tarballs without executing them, inspects install-time code, and prints clear **Proceed**, **Caution**, or **Block** verdicts. Use it for one-off `npx` commands or scan an existing project's direct dependencies.
 
-The default scan is deterministic, local, and requires no account or API key. AI review is optional, opt-in, and lets you choose an exact model or a maintained `fast`, `balanced`, or `strong` profile.
+The default scan is deterministic, local, and requires no account or API key. AI review is optional, opt-in, and lets you choose an exact model or a maintained `fast`, `balanced`, or `strong` profile. Version 1.5 also ships a zero-dependency MCP server with read-only package, project, and model-catalog tools.
 
 - [npm package](https://www.npmjs.com/package/npx-vibe)
 - [Live website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/)
@@ -63,6 +63,12 @@ npx --yes npx-vibe@latest --agent esbuild
 npx --yes npx-vibe@latest --agent --project .
 ```
 
+Or connect the native MCP server:
+
+```bash
+npx --yes npx-vibe@latest --mcp
+```
+
 ## Use npx-vibe with coding agents
 
 `--agent` turns the scanner into a predictable machine interface. It implies check-only mode, writes only JSON to stdout, disables terminal color and local review-memory writes, and never executes package code. Operational failures are JSON too, so an agent can fail closed instead of interpreting partial terminal output.
@@ -87,7 +93,7 @@ Example envelope:
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "npx-vibe", "version": "1.4.0" },
+  "tool": { "name": "npx-vibe", "version": "1.5.0" },
   "kind": "package-scan",
   "status": "complete",
   "decision": {
@@ -115,6 +121,39 @@ Example envelope:
 The complete deterministic report remains under `report`. Require `schemaVersion === 1`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. The outer `npx --yes` only suppresses npm's download prompt; agent mode rejects npx-vibe's execution flags such as `--force` and `--yes`.
 
 AI remains off by default in agent mode. If a user explicitly requests model interpretation, use a provider-specific environment variable and add `--ai online --provider <provider>`; never place a key in a generated command.
+
+## Connect npx-vibe through MCP
+
+Version 1.5 includes a read-only [Model Context Protocol](https://modelcontextprotocol.io/) server over stdio. It gives MCP-compatible AI applications a native tool surface without teaching them to parse terminal text or construct shell commands.
+
+Add this server configuration to an MCP client that supports local stdio servers:
+
+```json
+{
+  "mcpServers": {
+    "npx-vibe": {
+      "command": "npx",
+      "args": ["--yes", "npx-vibe@latest", "--mcp"]
+    }
+  }
+}
+```
+
+Global installations can use `npx-vibe-mcp` as the command with no arguments. Run `npx npx-vibe --mcp --help` for server-specific help.
+
+The server exposes three schema-backed tools:
+
+| MCP tool | Purpose |
+| --- | --- |
+| `scan_package` | Resolve, verify, and inspect one public npm package without executing it |
+| `scan_project` | Review direct registry dependencies from a project manifest or lockfile |
+| `list_models` | Return the bundled provider and model-profile catalog without a network request |
+
+Scan results return the same versioned decision contract in both `structuredContent` and a JSON text block for client compatibility. The tools are annotated read-only and non-destructive. `review` still requires human approval, while `stop`, `retry`, and MCP tool errors fail closed.
+
+AI remains off unless a tool call explicitly selects it. API keys are intentionally excluded from MCP tool arguments: configure provider-specific environment variables on the MCP server process so credentials do not enter prompts or tool history.
+
+The npm package includes MCP Registry metadata under `io.github.devrajsinh-jhala/npx-vibe`. Registry publication is a separate maintainer step after the matching npm version is live.
 
 ## Why developers use it
 
@@ -226,6 +265,7 @@ A verdict is a decision aid, not proof that a package is safe or malicious.
 ```text
 npx-vibe [options] <package-spec> [-- package arguments]
 npx-vibe --project <directory|package.json> [options]
+npx-vibe --mcp
 ```
 
 Common commands:
@@ -258,6 +298,9 @@ npx npx-vibe --project . --json
 # Agent-ready project report
 npx --yes npx-vibe@latest --agent --project .
 
+# Start the MCP server over stdio
+npx --yes npx-vibe@latest --mcp
+
 # Execute a Caution verdict without prompting
 npx npx-vibe --yes <package>
 
@@ -271,6 +314,7 @@ Useful options:
 --check
 --json
 --agent
+--mcp
 --project <path>
 --include-dev
 --ci
@@ -472,12 +516,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npx --yes npx-vibe@1.4.0 --project . --include-dev --ci
+      - run: npx --yes npx-vibe@1.5.0 --project . --include-dev --ci
 ```
 
 Project mode preserves the normal exit contract: `0` Proceed, `2` Caution, `3` Block, and `1` for an incomplete scan caused by an operational error. `--ci` and `--json` are intentionally separate so JSON output remains valid.
 
-The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. CI also packs the npm tarball, installs it into a clean temporary consumer project, and exercises the shipped CLI.
+The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. CI also packs the npm tarball, installs it into a clean temporary consumer project, and exercises the shipped CLI and MCP handshake from the exact artifact users receive.
 
 The tag-driven release workflow is prepared for [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) and `npm publish --provenance`. Configure the trusted publisher once, then push a version tag to publish without storing a long-lived npm token. See [RELEASING.md](./RELEASING.md).
 

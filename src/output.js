@@ -94,6 +94,10 @@ export function toJsonResult(result) {
 }
 
 export function toAgentResult(report, options = {}) {
+  return JSON.stringify(createAgentResult(report, options), null, 2);
+}
+
+export function createAgentResult(report, options = {}) {
   const kind = options.kind === "project-scan" ? "project-scan" : "package-scan";
   const exitCode = Number(options.exitCode ?? 1);
   const incomplete = exitCode === 1;
@@ -102,7 +106,7 @@ export function toAgentResult(report, options = {}) {
     ? Number(report.verdict.score)
     : null;
 
-  return JSON.stringify({
+  return {
     schemaVersion: 1,
     tool: {
       name: "npx-vibe",
@@ -125,11 +129,15 @@ export function toAgentResult(report, options = {}) {
           version: report?.package?.version ?? null,
         },
     report,
-  }, null, 2);
+  };
 }
 
 export function toAgentError(error, options = {}) {
-  return JSON.stringify({
+  return JSON.stringify(createAgentError(error, options), null, 2);
+}
+
+export function createAgentError(error, options = {}) {
+  return {
     schemaVersion: 1,
     tool: {
       name: "npx-vibe",
@@ -142,7 +150,7 @@ export function toAgentError(error, options = {}) {
       code: options.code ?? "operational_error",
       message: error instanceof Error ? error.message : String(error),
     },
-  }, null, 2);
+  };
 }
 
 function agentDecision(verdict, riskScore, exitCode, incomplete) {

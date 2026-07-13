@@ -1,4 +1,4 @@
 interface:
   display_name: "npx-vibe Package Preflight"
-  short_description: "Inspect npm packages before agent execution"
-  default_prompt: "Use $npx-vibe to inspect an unfamiliar npm package before installing or executing it."
+  short_description: "Inspect npm packages through MCP or CLI"
+  default_prompt: "Use $npx-vibe through its MCP tools when connected, or its agent CLI fallback, before installing or executing an unfamiliar npm package."

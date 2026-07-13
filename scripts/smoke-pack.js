@@ -49,6 +49,36 @@ try {
   if (!models.includes("balanced (default)")) {
     throw new Error("Packed CLI model catalog smoke test failed.");
   }
+  const mcpInput = [
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-11-25",
+        capabilities: {},
+        clientInfo: { name: "npx-vibe-smoke", version: "1.0.0" },
+      },
+    },
+    { jsonrpc: "2.0", method: "notifications/initialized" },
+    { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+  ].map((message) => JSON.stringify(message)).join("\n") + "\n";
+  const mcp = spawnSync(process.execPath, [cli, "--mcp"], {
+    cwd: consumer,
+    encoding: "utf8",
+    input: mcpInput,
+    shell: false,
+    windowsHide: true,
+  });
+  if (mcp.status !== 0) {
+    throw new Error(`Packed MCP CLI server failed.\n${mcp.stdout ?? ""}\n${mcp.stderr ?? ""}`.trim());
+  }
+  const mcpMessages = mcp.stdout.trim().split("\n").map((line) => JSON.parse(line));
+  const toolNames = mcpMessages.find((message) => message.id === 2)?.result?.tools?.map((tool) => tool.name);
+  if (mcpMessages.find((message) => message.id === 1)?.result?.protocolVersion !== "2025-11-25" ||
+      !toolNames?.includes("scan_package") || !toolNames?.includes("scan_project")) {
+    throw new Error("Packed MCP handshake and tool-discovery smoke test failed.");
+  }
   const emptyProject = join(temporary, "empty-project");
   mkdirSync(emptyProject, { recursive: true });
   writeFileSync(join(emptyProject, "package.json"), JSON.stringify({

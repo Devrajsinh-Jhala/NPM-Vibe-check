@@ -29,6 +29,19 @@ import {
 
 export async function main(argv = process.argv.slice(2)) {
   try {
+    if (argv[0] === "--mcp") {
+      if (argv.length > 1) {
+        if (argv.length === 2 && ["--help", "-h"].includes(argv[1])) {
+          console.log(mcpHelpText());
+          process.exitCode = 0;
+          return;
+        }
+        throw new Error("--mcp does not accept CLI scan arguments. Configure scans through MCP tools.");
+      }
+      const { startMcpServer } = await import("./mcp.js");
+      process.exitCode = await startMcpServer();
+      return;
+    }
     const exitCode = await run(argv);
     process.exitCode = exitCode;
   } catch (error) {
@@ -646,7 +659,7 @@ function boundedIntegerFlag(name, value, minimum, maximum) {
   return number;
 }
 
-function packageVersion() {
+export function packageVersion() {
   const here = dirname(fileURLToPath(import.meta.url));
   const packageJson = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
   return packageJson.version;
@@ -668,6 +681,7 @@ Examples:
   npx-vibe --project .
   npx-vibe --project . --include-dev --json
   npx-vibe --agent --project .
+  npx-vibe --mcp
   npx-vibe --project . --ci
   npx-vibe --models
   npx-vibe --provider gemini --api-key ... obscure-package
@@ -681,6 +695,7 @@ Options:
   --check                    Review only; do not execute
   --json                     Print JSON result; implies --check
   --agent                    Versioned, read-only JSON for coding agents; disables review-memory writes
+  --mcp                      Start the read-only MCP server over stdio
   --project <path>           Scan direct registry dependencies without executing them
   --include-dev              Include devDependencies in a project scan
   --ci                       Emit GitHub Actions annotations and a job summary
@@ -734,5 +749,23 @@ Privacy:
   Local project files, environment variables, npm tokens, and shell history are not sent.
   Project mode reads package.json and package-lock.json locally; neither file is sent to AI.
   Prefer provider-specific environment variables so API keys do not enter shell history.
+`;
+}
+
+function mcpHelpText() {
+  return `npx-vibe MCP server
+
+Start over stdio:
+  npx-vibe --mcp
+  npx-vibe-mcp
+
+Tools:
+  scan_package   Verify and inspect one public npm package
+  scan_project   Scan direct registry dependencies from a project
+  list_models    Return bundled provider model recommendations
+
+The server writes newline-delimited JSON-RPC to stdout. Package code is never
+executed, scan tools are read-only, AI is off unless a tool call explicitly
+enables it, and provider credentials are read only from environment variables.
 `;
 }

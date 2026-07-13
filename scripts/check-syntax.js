@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const files = [
-  "bin/npx-vibe.js",
+  ...readdirSync("bin")
+    .filter((name) => name.endsWith(".js"))
+    .map((name) => join("bin", name)),
   "scripts/check-syntax.js",
   "scripts/smoke-pack.js",
   "scripts/serve-site.js",
