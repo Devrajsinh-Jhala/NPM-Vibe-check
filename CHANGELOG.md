@@ -2,6 +2,12 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 1.5.1 - 2026-07-13
+
+### Fixed
+
+- Match the MCP Registry identifier to the canonical, case-sensitive GitHub namespace granted during publisher authentication.
+
 ## 1.5.0 - 2026-07-13
 
 ### Added

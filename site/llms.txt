@@ -42,7 +42,7 @@ Tools:
 - scan_project: inspect direct registry dependencies in a project
 - list_models: inspect bundled provider/model recommendations
 
-MCP scan results return the same schemaVersion 1 decision envelope in structuredContent and a JSON text block. Tools are read-only and do not accept API keys as arguments. AI is off by default; credentials must be configured in the MCP server environment. MCP Registry identifier: io.github.devrajsinh-jhala/npx-vibe.
+MCP scan results return the same schemaVersion 1 decision envelope in structuredContent and a JSON text block. Tools are read-only and do not accept API keys as arguments. AI is off by default; credentials must be configured in the MCP server environment. The active official MCP Registry identifier is io.github.Devrajsinh-Jhala/npx-vibe: https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe
 
 ## Decision contract
 

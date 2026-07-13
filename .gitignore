@@ -4,3 +4,5 @@ npm-debug.log*
 coverage/
 .env
 .env.*
+/mcp-publisher.exe
+/mcp-publisher.tar.gz

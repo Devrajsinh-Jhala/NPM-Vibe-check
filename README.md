@@ -14,6 +14,7 @@
 The default scan is deterministic, local, and requires no account or API key. AI review is optional, opt-in, and lets you choose an exact model or a maintained `fast`, `balanced`, or `strong` profile. Version 1.5 also ships a zero-dependency MCP server with read-only package, project, and model-catalog tools.
 
 - [npm package](https://www.npmjs.com/package/npx-vibe)
+- [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe)
 - [Live website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/)
 - [GitHub repository](https://github.com/Devrajsinh-Jhala/NPM-Vibe-check)
 - [Security policy](./SECURITY.md)
@@ -93,7 +94,7 @@ Example envelope:
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "npx-vibe", "version": "1.5.0" },
+  "tool": { "name": "npx-vibe", "version": "1.5.1" },
   "kind": "package-scan",
   "status": "complete",
   "decision": {
@@ -153,7 +154,7 @@ Scan results return the same versioned decision contract in both `structuredCont
 
 AI remains off unless a tool call explicitly selects it. API keys are intentionally excluded from MCP tool arguments: configure provider-specific environment variables on the MCP server process so credentials do not enter prompts or tool history.
 
-The npm package includes MCP Registry metadata under `io.github.devrajsinh-jhala/npx-vibe`. Registry publication is a separate maintainer step after the matching npm version is live.
+`npx-vibe@1.5.1` is [active in the official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe) as `io.github.Devrajsinh-Jhala/npx-vibe`. Registry clients can resolve the verified npm package and start its local stdio server with `--mcp`.
 
 ## Why developers use it
 
@@ -516,7 +517,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npx --yes npx-vibe@1.5.0 --project . --include-dev --ci
+      - run: npx --yes npx-vibe@1.5.1 --project . --include-dev --ci
 ```
 
 Project mode preserves the normal exit contract: `0` Proceed, `2` Caution, `3` Block, and `1` for an incomplete scan caused by an operational error. `--ci` and `--json` are intentionally separate so JSON output remains valid.
