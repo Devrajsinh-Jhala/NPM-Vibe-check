@@ -58,6 +58,38 @@ install-time network and process evidence remains.
 
 Action: review recommended before execution.`,
 
+  agent: `$ npx --yes npx-vibe@latest --agent esbuild
+{
+  "schemaVersion": 1,
+  "tool": { "name": "npx-vibe", "version": "1.4.0" },
+  "kind": "package-scan",
+  "status": "complete",
+  "decision": {
+    "verdict": "caution",
+    "riskScore": 43,
+    "action": "review",
+    "exitCode": 2,
+    "mayContinue": false,
+    "safeToExecute": false,
+    "requiresApproval": true,
+    "requiresHumanReview": true,
+    "blocked": false,
+    "mustStop": false
+  },
+  "subject": {
+    "type": "package",
+    "name": "esbuild",
+    "requested": "latest",
+    "version": "0.28.1"
+  },
+  "report": {
+    "findings": [
+      { "code": "lifecycle_hook", "file": "package.json" },
+      { "code": "network_and_shell", "file": "install.js" }
+    ]
+  }
+}`,
+
   block: `# Synthetic malicious fixture from the npx-vibe test suite
 x npx-vibe: Block  risk 100/100
 fixture: install-time secret exfiltration
@@ -77,6 +109,7 @@ const demoMeta = {
   proceed: "A typical clean package scan. No API key, model, or package execution is involved.",
   caution: "A real package with install-time behavior. Popularity provides context, but evidence still drives the recommendation.",
   ai: "Optional AI adds interpretation when requested. Deterministic findings remain the source of truth.",
+  agent: "Agent mode returns schema-versioned JSON, disables local history writes, and pauses the workflow on Caution.",
   block: "Synthetic test fixture used to demonstrate a high-confidence block recommendation.",
 };
 

@@ -1,0 +1,38 @@
+# npx-vibe
+
+> Evidence-first npm package and project dependency checks before code executes.
+
+npx-vibe is a zero-runtime-dependency Node.js CLI that resolves public npm packages, downloads and verifies registry tarballs without executing package code, inspects install-time behavior, and reports Proceed, Caution, or Block with source evidence.
+
+## Canonical links
+
+- Website: https://devrajsinh-jhala.github.io/NPM-Vibe-check/
+- npm: https://www.npmjs.com/package/npx-vibe
+- Source and documentation: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check
+- Agent Skill: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/tree/master/skills/npx-vibe
+- Security policy: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/SECURITY.md
+
+## Agent-safe commands
+
+Inspect one package with versioned JSON output:
+
+    npx --yes npx-vibe@latest --agent <package-spec>
+
+Inspect direct registry dependencies in the current project:
+
+    npx --yes npx-vibe@latest --agent --project .
+
+Install the portable Agent Skill:
+
+    npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g
+
+## Decision contract
+
+- schemaVersion: currently 1
+- decision.action=continue: the requested workflow may continue
+- decision.action=review: pause and request human review
+- decision.action=stop: do not install or execute
+- decision.action=retry: the scan was incomplete; fail closed
+- exit codes: 0 Proceed, 2 Caution, 3 Block, 1 operational error or incomplete project scan
+
+AI review is off by default. Online or local AI is opt-in and never replaces deterministic evidence. A Proceed verdict is a review signal, not proof that a package is safe.

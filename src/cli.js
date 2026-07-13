@@ -14,6 +14,8 @@ import {
   renderGitHubActionsAnnotations,
   renderProjectDashboard,
   renderProjectMarkdownSummary,
+  toAgentError,
+  toAgentResult,
   toJsonResult,
 } from "./output.js";
 import { formatProviderModelCatalog, modelProfiles } from "./providers.js";
@@ -30,7 +32,11 @@ export async function main(argv = process.argv.slice(2)) {
     const exitCode = await run(argv);
     process.exitCode = exitCode;
   } catch (error) {
-    console.error(`npx-vibe: ${error.message}`);
+    if (argvRequestsAgent(argv)) {
+      console.log(toAgentError(error, { version: packageVersion() }));
+    } else {
+      console.error(`npx-vibe: ${error.message}`);
+    }
     process.exitCode = 1;
   }
 }
@@ -55,7 +61,14 @@ export async function run(argv, env = process.env) {
 
   if (config.projectPath) {
     const scan = await scanProject(config.projectPath, config, reviewPackage);
-    if (config.json) {
+    const exitCode = projectExitCode(scan);
+    if (config.agent) {
+      console.log(toAgentResult(scan, {
+        kind: "project-scan",
+        exitCode,
+        version: packageVersion(),
+      }));
+    } else if (config.json) {
       console.log(toJsonResult(scan));
     } else {
       process.stdout.write(renderProjectDashboard(scan, {
@@ -68,14 +81,24 @@ export async function run(argv, env = process.env) {
         appendFileSync(env.GITHUB_STEP_SUMMARY, renderProjectMarkdownSummary(scan), "utf8");
       }
     }
-    return projectExitCode(scan);
+    return exitCode;
   }
 
   const { result, manifest, snapshot } = await reviewPackage(config.packageSpec, config);
 
+  const exitCode = checkExitCode(result.verdict.verdict);
+  if (config.agent) {
+    console.log(toAgentResult(result, {
+      kind: "package-scan",
+      exitCode,
+      version: packageVersion(),
+    }));
+    return exitCode;
+  }
+
   if (config.json) {
     console.log(toJsonResult(result));
-    return checkExitCode(result.verdict.verdict);
+    return exitCode;
   }
 
   process.stdout.write(renderDashboard(result, {
@@ -212,6 +235,7 @@ export function parseArgs(argv, env = process.env) {
     projectAiLimit: boundedIntegerFromEnv(env.NPX_VIBE_AI_LIMIT, 3, 0, 100),
     includeDev: false,
     ci: false,
+    agent: false,
     check: false,
     json: false,
     models: false,
@@ -261,6 +285,13 @@ export function parseArgs(argv, env = process.env) {
         case "--json":
           config.json = true;
           config.check = true;
+          break;
+        case "--agent":
+          config.agent = true;
+          config.json = true;
+          config.check = true;
+          config.color = false;
+          config.historyEnabled = false;
           break;
         case "--project":
           config.projectPath = readValue();
@@ -394,6 +425,14 @@ export function parseArgs(argv, env = process.env) {
 
   if (config.ci && config.json) {
     throw new Error("Use either --ci or --json so machine-readable output remains valid.");
+  }
+
+  if (config.agent && (config.yes || config.force || config.allowInstallScripts)) {
+    throw new Error("--agent is read-only and cannot be combined with --yes, --force, or --allow-install-scripts.");
+  }
+
+  if (config.agent && config.packageArgs.length) {
+    throw new Error("--agent performs a read-only scan and does not accept package execution arguments.");
   }
 
   if (config.projectPath && config.bin) {
@@ -564,6 +603,33 @@ function numberFlag(name, value) {
   return number;
 }
 
+function argvRequestsAgent(argv) {
+  const optionsWithValues = new Set([
+    "--project", "--concurrency", "--ai-limit", "--ai", "--provider", "--model",
+    "--model-profile", "--api-key", "--api-url", "--ollama-url", "--ollama-model",
+    "--registry", "--bin", "--age-days", "--downloads", "--caution-score",
+    "--block-score", "--timeout-ms", "--ai-timeout-ms", "--max-ai-chars", "--history-file",
+  ]);
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--") {
+      return false;
+    }
+    if (token === "--agent") {
+      return true;
+    }
+    if (optionsWithValues.has(token)) {
+      index += 1;
+      continue;
+    }
+    if (!token.startsWith("-")) {
+      return false;
+    }
+  }
+  return false;
+}
+
 function boundedIntegerFromEnv(value, fallback, minimum, maximum) {
   if (value === undefined || value === "") {
     return fallback;
@@ -597,9 +663,11 @@ Examples:
   npx-vibe cowsay -- hello
   npx-vibe --check obscure-package
   npx-vibe --json obscure-package
+  npx-vibe --agent obscure-package
   npx-vibe --bin tsc typescript -- --version
   npx-vibe --project .
   npx-vibe --project . --include-dev --json
+  npx-vibe --agent --project .
   npx-vibe --project . --ci
   npx-vibe --models
   npx-vibe --provider gemini --api-key ... obscure-package
@@ -612,6 +680,7 @@ Examples:
 Options:
   --check                    Review only; do not execute
   --json                     Print JSON result; implies --check
+  --agent                    Versioned, read-only JSON for coding agents; disables review-memory writes
   --project <path>           Scan direct registry dependencies without executing them
   --include-dev              Include devDependencies in a project scan
   --ci                       Emit GitHub Actions annotations and a job summary

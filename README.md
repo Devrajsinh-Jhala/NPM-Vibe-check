@@ -22,7 +22,7 @@ The default scan is deterministic, local, and requires no account or API key. AI
 
 ## Live adoption
 
-The [project website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/#momentum) displays the current seven-day download total and daily trend directly from npm's public download API:
+The [project website](https://devrajsinh-jhala.github.io/NPM-Vibe-check/) displays the current seven-day download total directly from npm's public download API:
 
 - [weekly total](https://api.npmjs.org/downloads/point/last-week/npx-vibe)
 - [daily seven-day range](https://api.npmjs.org/downloads/range/last-week/npx-vibe)
@@ -55,6 +55,66 @@ Scan an existing project's direct dependencies:
 ```bash
 npx npx-vibe --project .
 ```
+
+Give a coding agent a stable, read-only result:
+
+```bash
+npx --yes npx-vibe@latest --agent esbuild
+npx --yes npx-vibe@latest --agent --project .
+```
+
+## Use npx-vibe with coding agents
+
+`--agent` turns the scanner into a predictable machine interface. It implies check-only mode, writes only JSON to stdout, disables terminal color and local review-memory writes, and never executes package code. Operational failures are JSON too, so an agent can fail closed instead of interpreting partial terminal output.
+
+Install the portable Agent Skill for Codex, Claude Code, Cursor, VS Code, and other compatible agents:
+
+```bash
+npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g
+```
+
+The skill tells an agent to preflight unfamiliar packages before `npx`, `npm exec`, or dependency installation and then apply the normalized decision:
+
+| `decision.action` | Required behavior |
+| --- | --- |
+| `continue` | Continue only with the package action the user already requested |
+| `review` | Pause, summarize source evidence, and request human approval |
+| `stop` | Do not install or execute the package |
+| `retry` | The scan is incomplete; report the error and do not infer safety |
+
+Example envelope:
+
+```json
+{
+  "schemaVersion": 1,
+  "tool": { "name": "npx-vibe", "version": "1.4.0" },
+  "kind": "package-scan",
+  "status": "complete",
+  "decision": {
+    "verdict": "caution",
+    "riskScore": 43,
+    "action": "review",
+    "exitCode": 2,
+    "mayContinue": false,
+    "safeToExecute": false,
+    "requiresApproval": true,
+    "requiresHumanReview": true,
+    "blocked": false,
+    "mustStop": false
+  },
+  "subject": {
+    "type": "package",
+    "name": "esbuild",
+    "requested": "latest",
+    "version": "0.28.1"
+  },
+  "report": {}
+}
+```
+
+The complete deterministic report remains under `report`. Require `schemaVersion === 1`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. The outer `npx --yes` only suppresses npm's download prompt; agent mode rejects npx-vibe's execution flags such as `--force` and `--yes`.
+
+AI remains off by default in agent mode. If a user explicitly requests model interpretation, use a provider-specific environment variable and add `--ai online --provider <provider>`; never place a key in a generated command.
 
 ## Why developers use it
 
@@ -177,6 +237,9 @@ npx npx-vibe --check <package>
 # Machine-readable output
 npx npx-vibe --json <package>
 
+# Versioned, fail-closed JSON for coding agents
+npx --yes npx-vibe@latest --agent <package>
+
 # Review, then execute when permitted
 npx npx-vibe <package> -- <arguments>
 
@@ -192,6 +255,9 @@ npx npx-vibe --project . --include-dev
 # Machine-readable project report
 npx npx-vibe --project . --json
 
+# Agent-ready project report
+npx --yes npx-vibe@latest --agent --project .
+
 # Execute a Caution verdict without prompting
 npx npx-vibe --yes <package>
 
@@ -204,6 +270,7 @@ Useful options:
 ```text
 --check
 --json
+--agent
 --project <path>
 --include-dev
 --ci
@@ -368,7 +435,7 @@ Official references: [OpenAI models](https://developers.openai.com/api/docs/guid
 
 Provider catalogs change independently of `npx-vibe`. The resolved model is always printed, `--model` always wins, and `--models` shows the recommendations bundled with your installed release. Custom OpenAI-compatible endpoints require an explicit `--model`.
 
-## Automation and CI
+## Automation, agents, and CI
 
 Use JSON plus exit codes in local automation:
 
@@ -376,6 +443,15 @@ Use JSON plus exit codes in local automation:
 npx npx-vibe --json <package> > npx-vibe-report.json
 npx npx-vibe --project . --json > npx-vibe-project-report.json
 ```
+
+Use the versioned agent envelope when another tool or coding agent owns the decision loop:
+
+```bash
+npx --yes npx-vibe@latest --agent <package>
+npx --yes npx-vibe@latest --agent --project .
+```
+
+Agent mode keeps stdout machine-readable for successful, incomplete, and failed scans. It is deliberately incompatible with `--force`, npx-vibe's `--yes`, `--allow-install-scripts`, and package execution arguments.
 
 For GitHub Actions, `--ci` emits a warning for each Caution result, an error for each Block or operational failure, and writes a package table to the job summary:
 
@@ -396,7 +472,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npx --yes npx-vibe@1.3.0 --project . --include-dev --ci
+      - run: npx --yes npx-vibe@1.4.0 --project . --include-dev --ci
 ```
 
 Project mode preserves the normal exit contract: `0` Proceed, `2` Caution, `3` Block, and `1` for an incomplete scan caused by an operational error. `--ci` and `--json` are intentionally separate so JSON output remains valid.

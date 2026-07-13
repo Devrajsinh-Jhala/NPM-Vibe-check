@@ -93,6 +93,81 @@ export function toJsonResult(result) {
   return JSON.stringify(result, null, 2);
 }
 
+export function toAgentResult(report, options = {}) {
+  const kind = options.kind === "project-scan" ? "project-scan" : "package-scan";
+  const exitCode = Number(options.exitCode ?? 1);
+  const incomplete = exitCode === 1;
+  const verdict = report?.verdict?.verdict ?? null;
+  const riskScore = Number.isFinite(Number(report?.verdict?.score))
+    ? Number(report.verdict.score)
+    : null;
+
+  return JSON.stringify({
+    schemaVersion: 1,
+    tool: {
+      name: "npx-vibe",
+      version: options.version ?? "unknown",
+    },
+    kind,
+    status: incomplete ? "incomplete" : "complete",
+    decision: agentDecision(verdict, riskScore, exitCode, incomplete),
+    subject: kind === "project-scan"
+      ? {
+          type: "project",
+          name: report?.project?.name ?? null,
+          version: report?.project?.version ?? null,
+          manifestPath: report?.project?.manifestPath ?? null,
+        }
+      : {
+          type: "package",
+          name: report?.package?.name ?? null,
+          requested: report?.package?.requested ?? null,
+          version: report?.package?.version ?? null,
+        },
+    report,
+  }, null, 2);
+}
+
+export function toAgentError(error, options = {}) {
+  return JSON.stringify({
+    schemaVersion: 1,
+    tool: {
+      name: "npx-vibe",
+      version: options.version ?? "unknown",
+    },
+    kind: "error",
+    status: "error",
+    decision: agentDecision(null, null, 1, true),
+    error: {
+      code: options.code ?? "operational_error",
+      message: error instanceof Error ? error.message : String(error),
+    },
+  }, null, 2);
+}
+
+function agentDecision(verdict, riskScore, exitCode, incomplete) {
+  const action = incomplete
+    ? "retry"
+    : verdict === "proceed"
+      ? "continue"
+      : verdict === "caution"
+        ? "review"
+        : "stop";
+
+  return {
+    verdict,
+    riskScore,
+    action,
+    exitCode,
+    mayContinue: action === "continue",
+    safeToExecute: action === "continue",
+    requiresApproval: action === "review",
+    requiresHumanReview: action === "review" || action === "retry",
+    blocked: action === "stop",
+    mustStop: action === "stop" || action === "retry",
+  };
+}
+
 export function renderProjectDashboard(scan, options = {}) {
   const color = createColor(Boolean(options.color));
   const verdict = scan.verdict.verdict;

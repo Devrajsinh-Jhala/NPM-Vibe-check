@@ -1,7 +1,7 @@
 {
   "name": "npx-vibe",
-  "version": "1.3.0",
-  "description": "Evidence-first npm package and project dependency checks before code executes.",
+  "version": "1.4.0",
+  "description": "Evidence-first npm package and project dependency checks for developers and coding agents before code executes.",
   "type": "module",
   "homepage": "https://devrajsinh-jhala.github.io/NPM-Vibe-check/",
   "repository": {
@@ -17,6 +17,7 @@
   "files": [
     "bin",
     "src",
+    "skills",
     "README.md"
   ],
   "scripts": {
@@ -42,7 +43,10 @@
     "ai-security",
     "dependency-scanner",
     "github-actions",
-    "npm-security"
+    "npm-security",
+    "agent-skills",
+    "coding-agents",
+    "agent-tools"
   ],
   "license": "MIT",
   "author": "Devrajsinh Jhala",

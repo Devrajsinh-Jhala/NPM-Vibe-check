@@ -2,6 +2,22 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 1.4.0 - 2026-07-13
+
+### Added
+
+- `--agent` emits a versioned, non-interactive JSON envelope for package and project scans, including a normalized `continue`, `review`, `stop`, or `retry` action.
+- Agent mode fails closed on incomplete scans, returns operational failures as JSON, disables terminal color and local review-memory writes, and rejects execution-oriented flags.
+- A portable `npx-vibe` Agent Skill teaches compatible coding agents to preflight unfamiliar npm packages and pause for human review on Caution results.
+- `site/llms.txt` provides concise agent-readable product, command, and decision-contract documentation.
+- Packed-install smoke coverage now validates the shipped agent contract.
+
+### Changed
+
+- Agent integration documentation now covers package scans, project scans, stable exit codes, safe AI opt-in, and Skills CLI installation.
+- The landing page now includes a dedicated coding-agent workflow, animated agent demo, and interactive Agent JSON report.
+- The automated test suite now covers 55 package, project, provider, output, history, and agent-contract behaviors.
+
 ## 1.3.0 - 2026-07-13
 
 ### Added

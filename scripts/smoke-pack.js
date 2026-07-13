@@ -60,6 +60,11 @@ try {
   if (!projectScan.includes("Scanned: 0/0 direct dependencies")) {
     throw new Error("Packed CLI project-scan smoke test failed.");
   }
+  const agentScan = run(process.execPath, [cli, "--agent", "--project", emptyProject], consumer);
+  const agentPayload = JSON.parse(agentScan.stdout);
+  if (agentPayload.schemaVersion !== 1 || agentPayload.kind !== "project-scan") {
+    throw new Error("Packed CLI agent-contract smoke test failed.");
+  }
 
   console.log(`Packed-install smoke test passed for npx-vibe@${version}.`);
 } finally {

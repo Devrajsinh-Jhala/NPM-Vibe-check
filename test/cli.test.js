@@ -99,6 +99,31 @@ test("parseArgs supports lock-aware project and CI scans", () => {
   assert.equal(args.projectAiLimit, 2);
 });
 
+test("--agent creates a non-interactive read-only package scan", () => {
+  const args = parseArgs(["--agent", "esbuild"], {});
+  assert.equal(args.agent, true);
+  assert.equal(args.json, true);
+  assert.equal(args.check, true);
+  assert.equal(args.color, false);
+  assert.equal(args.historyEnabled, false);
+  assert.equal(args.aiMode, "off");
+});
+
+test("--agent supports project scans and explicit AI opt-in", () => {
+  const project = parseArgs(["--agent", "--project", "."], {});
+  const online = parseArgs(["--agent", "--ai", "online", "--provider", "gemini", "esbuild"], {});
+  assert.equal(project.projectPath, ".");
+  assert.equal(online.aiMode, "online");
+  assert.equal(online.provider, "gemini");
+});
+
+test("--agent rejects execution-oriented options and package arguments", () => {
+  assert.throws(() => parseArgs(["--agent", "--force", "esbuild"], {}), /read-only/);
+  assert.throws(() => parseArgs(["--agent", "--yes", "esbuild"], {}), /read-only/);
+  assert.throws(() => parseArgs(["--agent", "--allow-install-scripts", "esbuild"], {}), /read-only/);
+  assert.throws(() => parseArgs(["--agent", "typescript", "--", "--version"], {}), /does not accept/);
+});
+
 test("project-only flags reject ambiguous package mode combinations", () => {
   assert.throws(() => parseArgs(["--include-dev", "esbuild"], {}), /requires --project/);
   assert.throws(() => parseArgs(["--ci", "esbuild"], {}), /requires --project/);
