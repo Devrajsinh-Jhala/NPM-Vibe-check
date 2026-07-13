@@ -20,6 +20,7 @@ All notable changes to `npx-vibe` are documented here.
 - Concurrent scans merge integrity-keyed review history safely instead of allowing stale writers to drop another package's record.
 - Common semver ranges using `||` are now resolved correctly.
 - Packed-install smoke tests now exercise the shipped project-scan workflow.
+- The tag-driven release workflow detects versions already published manually, preventing duplicate npm publish failures while still creating the GitHub Release.
 
 ## 1.2.0 - 2026-06-25
 
