@@ -39,4 +39,5 @@ test("resolveVersion supports tags and common semver ranges", () => {
 test("matchSemverRange handles comparator sets", () => {
   assert.equal(matchSemverRange("1.5.0", ">=1.0.0 <2.0.0"), true);
   assert.equal(matchSemverRange("2.0.0", ">=1.0.0 <2.0.0"), false);
+  assert.equal(matchSemverRange("3.1.0", "^1.0.0 || ^3.0.0"), true);
 });

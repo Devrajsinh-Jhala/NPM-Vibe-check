@@ -102,6 +102,10 @@ export function matchSemverRange(version, range) {
     return true;
   }
 
+  if (wanted.includes("||")) {
+    return wanted.split("||").some((candidate) => matchSemverRange(version, candidate.trim()));
+  }
+
   if (/^\d+\.x$/i.test(wanted) || /^\d+\.\*$/.test(wanted)) {
     const major = Number(wanted.split(".")[0]);
     return parsed.major === major;

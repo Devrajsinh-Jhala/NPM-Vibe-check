@@ -49,6 +49,17 @@ try {
   if (!models.includes("balanced (default)")) {
     throw new Error("Packed CLI model catalog smoke test failed.");
   }
+  const emptyProject = join(temporary, "empty-project");
+  mkdirSync(emptyProject, { recursive: true });
+  writeFileSync(join(emptyProject, "package.json"), JSON.stringify({
+    private: true,
+    name: "npx-vibe-empty-project",
+    version: "0.0.0",
+  }));
+  const projectScan = run(process.execPath, [cli, "--project", emptyProject, "--no-history"], consumer).stdout;
+  if (!projectScan.includes("Scanned: 0/0 direct dependencies")) {
+    throw new Error("Packed CLI project-scan smoke test failed.");
+  }
 
   console.log(`Packed-install smoke test passed for npx-vibe@${version}.`);
 } finally {

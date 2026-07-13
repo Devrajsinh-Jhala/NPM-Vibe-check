@@ -124,7 +124,7 @@ export function saveReviewMemory(memory, fingerprint, result) {
         : null,
     };
 
-    const packages = { ...memory.data.packages };
+    const packages = { ...latestPackages(memory) };
     const existing = packages[fingerprint.packageName] ?? [];
     packages[fingerprint.packageName] = [
       record,
@@ -149,6 +149,21 @@ export function saveReviewMemory(memory, fingerprint, result) {
   } catch (error) {
     return { saved: false, reason: `Could not save local review memory: ${error.message}` };
   }
+}
+
+function latestPackages(memory) {
+  if (!existsSync(memory.path)) {
+    return memory.data.packages;
+  }
+  try {
+    const latest = JSON.parse(readFileSync(memory.path, "utf8"));
+    if (latest?.schemaVersion === HISTORY_SCHEMA_VERSION && typeof latest.packages === "object") {
+      return latest.packages;
+    }
+  } catch {
+    // Fall back to the already validated in-memory copy.
+  }
+  return memory.data.packages;
 }
 
 export function resolveHistoryPath(options = {}) {

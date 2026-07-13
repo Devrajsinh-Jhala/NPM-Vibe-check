@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
@@ -9,8 +9,15 @@ import { inspectTarball } from "./tarball.js";
 import { analyzePackage, addAiUnavailableFinding } from "./analysis.js";
 import { maybeRunAiReview } from "./ai.js";
 import { decideVerdict, checkExitCode } from "./verdict.js";
-import { renderDashboard, toJsonResult } from "./output.js";
+import {
+  renderDashboard,
+  renderGitHubActionsAnnotations,
+  renderProjectDashboard,
+  renderProjectMarkdownSummary,
+  toJsonResult,
+} from "./output.js";
 import { formatProviderModelCatalog, modelProfiles } from "./providers.js";
+import { projectExitCode, scanProject } from "./project.js";
 import {
   compareReviewMemory,
   createReviewFingerprint,
@@ -44,6 +51,24 @@ export async function run(argv, env = process.env) {
   if (config.models) {
     console.log(formatProviderModelCatalog());
     return 0;
+  }
+
+  if (config.projectPath) {
+    const scan = await scanProject(config.projectPath, config, reviewPackage);
+    if (config.json) {
+      console.log(toJsonResult(scan));
+    } else {
+      process.stdout.write(renderProjectDashboard(scan, {
+        color: config.color && process.stdout.isTTY,
+      }));
+    }
+    if (config.ci && env.GITHUB_ACTIONS === "true") {
+      process.stdout.write(renderGitHubActionsAnnotations(scan));
+      if (env.GITHUB_STEP_SUMMARY) {
+        appendFileSync(env.GITHUB_STEP_SUMMARY, renderProjectMarkdownSummary(scan), "utf8");
+      }
+    }
+    return projectExitCode(scan);
   }
 
   const { result, manifest, snapshot } = await reviewPackage(config.packageSpec, config);
@@ -182,6 +207,11 @@ export function parseArgs(argv, env = process.env) {
     historyFile: env.NPX_VIBE_HISTORY_FILE,
     npmBin: env.NPX_VIBE_NPM_BIN,
     bin: env.NPX_VIBE_BIN,
+    projectPath: undefined,
+    projectConcurrency: boundedIntegerFromEnv(env.NPX_VIBE_CONCURRENCY, 3, 1, 8),
+    projectAiLimit: boundedIntegerFromEnv(env.NPX_VIBE_AI_LIMIT, 3, 0, 100),
+    includeDev: false,
+    ci: false,
     check: false,
     json: false,
     models: false,
@@ -231,6 +261,24 @@ export function parseArgs(argv, env = process.env) {
         case "--json":
           config.json = true;
           config.check = true;
+          break;
+        case "--project":
+          config.projectPath = readValue();
+          config.check = true;
+          break;
+        case "--include-dev":
+          config.includeDev = true;
+          break;
+        case "--ci":
+          config.ci = true;
+          config.check = true;
+          config.color = false;
+          break;
+        case "--concurrency":
+          config.projectConcurrency = boundedIntegerFlag(parsed.name, readValue(), 1, 8);
+          break;
+        case "--ai-limit":
+          config.projectAiLimit = boundedIntegerFlag(parsed.name, readValue(), 0, 100);
           break;
         case "--models":
           config.models = true;
@@ -328,8 +376,32 @@ export function parseArgs(argv, env = process.env) {
     }
   }
 
-  if (!config.help && !config.version && !config.models && !config.packageSpec) {
-    throw new Error("Missing package spec. Try --help.");
+  if (!config.help && !config.version && !config.models && !config.packageSpec && !config.projectPath) {
+    throw new Error("Missing package spec or --project <path>. Try --help.");
+  }
+
+  if (config.projectPath && config.packageSpec) {
+    throw new Error("Use either --project <path> or a package spec, not both.");
+  }
+
+  if (config.includeDev && !config.projectPath) {
+    throw new Error("--include-dev requires --project <path>.");
+  }
+
+  if (config.ci && !config.projectPath) {
+    throw new Error("--ci requires --project <path>.");
+  }
+
+  if (config.ci && config.json) {
+    throw new Error("Use either --ci or --json so machine-readable output remains valid.");
+  }
+
+  if (config.projectPath && config.bin) {
+    throw new Error("--bin applies to executable package mode, not project scans.");
+  }
+
+  if (config.projectPath && config.allowInstallScripts) {
+    throw new Error("Project scans never execute install scripts; remove --allow-install-scripts.");
   }
 
   if (!["auto", "off", "online", "ollama"].includes(config.aiMode)) {
@@ -492,6 +564,22 @@ function numberFlag(name, value) {
   return number;
 }
 
+function boundedIntegerFromEnv(value, fallback, minimum, maximum) {
+  if (value === undefined || value === "") {
+    return fallback;
+  }
+  const number = Number(value);
+  return Number.isInteger(number) && number >= minimum && number <= maximum ? number : fallback;
+}
+
+function boundedIntegerFlag(name, value, minimum, maximum) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < minimum || number > maximum) {
+    throw new Error(`${name} must be an integer from ${minimum} to ${maximum}.`);
+  }
+  return number;
+}
+
 function packageVersion() {
   const here = dirname(fileURLToPath(import.meta.url));
   const packageJson = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
@@ -503,12 +591,16 @@ function helpText() {
 
 Usage:
   npx-vibe [options] <package-spec> [-- package args]
+  npx-vibe --project <directory|package.json> [options]
 
 Examples:
   npx-vibe cowsay -- hello
   npx-vibe --check obscure-package
   npx-vibe --json obscure-package
   npx-vibe --bin tsc typescript -- --version
+  npx-vibe --project .
+  npx-vibe --project . --include-dev --json
+  npx-vibe --project . --ci
   npx-vibe --models
   npx-vibe --provider gemini --api-key ... obscure-package
   OPENAI_API_KEY=... npx-vibe --ai online obscure-package
@@ -520,6 +612,11 @@ Examples:
 Options:
   --check                    Review only; do not execute
   --json                     Print JSON result; implies --check
+  --project <path>           Scan direct registry dependencies without executing them
+  --include-dev              Include devDependencies in a project scan
+  --ci                       Emit GitHub Actions annotations and a job summary
+  --concurrency <1-8>        Heuristic project-scan concurrency; default 3
+  --ai-limit <0-100>         Maximum triggered AI reviews per project scan; default 3
   --models                   Show bundled provider model recommendations
   --yes, -y                  Execute Caution verdicts without prompting
   --force                    Execute even when verdict is Block
@@ -566,6 +663,7 @@ Dashboard details:
 Privacy:
   Online AI review sends only selected package metadata/files from the npm tarball.
   Local project files, environment variables, npm tokens, and shell history are not sent.
+  Project mode reads package.json and package-lock.json locally; neither file is sent to AI.
   Prefer provider-specific environment variables so API keys do not enter shell history.
 `;
 }

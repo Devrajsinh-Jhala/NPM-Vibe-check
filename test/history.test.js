@@ -77,3 +77,20 @@ test("review memory can be disabled", () => {
   assert.equal(compareReviewMemory(memory, fingerprint()).status, "disabled");
   assert.equal(saveReviewMemory(memory, fingerprint(), {}).saved, false);
 });
+
+test("parallel reviewers merge stale history snapshots instead of dropping packages", () => {
+  const directory = mkdtempSync(join(tmpdir(), "npx-vibe-history-"));
+  const historyFile = join(directory, "reviews.json");
+  const firstMemory = loadReviewMemory({ historyFile });
+  const secondMemory = loadReviewMemory({ historyFile });
+  const first = fingerprint();
+  const second = { ...fingerprint(), packageName: "another-demo" };
+  const result = { verdict: { verdict: "proceed", score: 0 }, ai: { status: "skipped" } };
+
+  saveReviewMemory(firstMemory, first, result);
+  saveReviewMemory(secondMemory, second, result);
+
+  const packages = JSON.parse(readFileSync(historyFile, "utf8")).packages;
+  assert.ok(packages.demo);
+  assert.ok(packages["another-demo"]);
+});

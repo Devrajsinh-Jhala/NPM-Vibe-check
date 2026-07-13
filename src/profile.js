@@ -1,8 +1,8 @@
-const USER_AGENT = "npx-vibe/1.2.0 (+https://www.npmjs.com/package/npx-vibe)";
+const USER_AGENT = "npx-vibe/1.3.0 (+https://www.npmjs.com/package/npx-vibe)";
 
 export async function buildPackageProfile(packument, manifest, version, options = {}) {
   const repository = normalizeRepository(manifest.repository ?? packument.repository);
-  const github = repository.github
+  const github = repository.github && options.githubMetadata !== false
     ? await fetchGitHubProfile(repository.github, options).catch((error) => ({ error: error.message }))
     : null;
 

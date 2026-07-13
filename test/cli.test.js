@@ -78,3 +78,31 @@ test("--bin reports the executable names available from a package", () => {
     /Available binaries: tsc, tsserver/,
   );
 });
+
+test("parseArgs supports lock-aware project and CI scans", () => {
+  const args = parseArgs([
+    "--project",
+    ".",
+    "--include-dev",
+    "--ci",
+    "--concurrency",
+    "4",
+    "--ai-limit",
+    "2",
+  ], {});
+  assert.equal(args.projectPath, ".");
+  assert.equal(args.includeDev, true);
+  assert.equal(args.ci, true);
+  assert.equal(args.check, true);
+  assert.equal(args.color, false);
+  assert.equal(args.projectConcurrency, 4);
+  assert.equal(args.projectAiLimit, 2);
+});
+
+test("project-only flags reject ambiguous package mode combinations", () => {
+  assert.throws(() => parseArgs(["--include-dev", "esbuild"], {}), /requires --project/);
+  assert.throws(() => parseArgs(["--ci", "esbuild"], {}), /requires --project/);
+  assert.throws(() => parseArgs(["--project", ".", "esbuild"], {}), /either --project/);
+  assert.throws(() => parseArgs(["--project", ".", "--bin", "tool"], {}), /not project scans/);
+  assert.throws(() => parseArgs(["--project", ".", "--ci", "--json"], {}), /either --ci or --json/);
+});

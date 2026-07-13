@@ -7,9 +7,9 @@
 [![Node.js](https://img.shields.io/node/v/npx-vibe.svg)](https://www.npmjs.com/package/npx-vibe)
 [![License: MIT](https://img.shields.io/npm/l/npx-vibe.svg)](./LICENSE)
 
-**Evidence-first safety checks for npm packages before `npx` executes them.**
+**Evidence-first safety checks for npm packages and project dependencies before code executes.**
 
-`npx-vibe` resolves a package from the public npm registry, downloads and verifies its tarball without executing it, inspects install-time code, and prints a clear **Proceed**, **Caution**, or **Block** verdict.
+`npx-vibe` resolves packages from the public npm registry, downloads and verifies their tarballs without executing them, inspects install-time code, and prints clear **Proceed**, **Caution**, or **Block** verdicts. Use it for one-off `npx` commands or scan an existing project's direct dependencies.
 
 The default scan is deterministic, local, and requires no account or API key. AI review is optional, opt-in, and lets you choose an exact model or a maintained `fast`, `balanced`, or `strong` profile.
 
@@ -50,6 +50,12 @@ npm install -g npx-vibe
 npx-vibe --check <package>
 ```
 
+Scan an existing project's direct dependencies:
+
+```bash
+npx npx-vibe --project .
+```
+
 ## Why developers use it
 
 Running `npx some-package` can download code and execute a package binary immediately. Packages may also declare lifecycle scripts that run during installation.
@@ -62,6 +68,8 @@ Running `npx some-package` can download code and execute a package binary immedi
 4. Verify npm integrity metadata and inspect bounded source files.
 5. Show matched evidence and a risk verdict.
 6. Execute only after the verdict allows it.
+
+For an existing app, `--project` repeats the same read-only review across direct registry dependencies and aggregates the result. This makes the check useful in local development and pull-request CI, not only before an unfamiliar `npx` command.
 
 By default, execution uses npm with install scripts ignored. Use `--allow-install-scripts` only when you intentionally want reviewed root lifecycle scripts to run.
 
@@ -157,6 +165,7 @@ A verdict is a decision aid, not proof that a package is safe or malicious.
 
 ```text
 npx-vibe [options] <package-spec> [-- package arguments]
+npx-vibe --project <directory|package.json> [options]
 ```
 
 Common commands:
@@ -174,6 +183,15 @@ npx npx-vibe <package> -- <arguments>
 # Select one executable from a package with multiple binaries
 npx npx-vibe --bin tsc typescript -- --version
 
+# Scan production and optional dependencies from this project
+npx npx-vibe --project .
+
+# Include direct development dependencies
+npx npx-vibe --project . --include-dev
+
+# Machine-readable project report
+npx npx-vibe --project . --json
+
 # Execute a Caution verdict without prompting
 npx npx-vibe --yes <package>
 
@@ -186,6 +204,11 @@ Useful options:
 ```text
 --check
 --json
+--project <path>
+--include-dev
+--ci
+--concurrency <1-8>
+--ai-limit <0-100>
 --yes, -y
 --force
 --bin <name>
@@ -210,6 +233,43 @@ Useful options:
 ```
 
 Run `npx npx-vibe --help` for the complete CLI reference.
+
+## Project dependency scans
+
+Project mode turns the one-package review into a repeatable dependency preflight:
+
+```bash
+npx npx-vibe --project .
+```
+
+It reads `package.json` and, when present, `package-lock.json` locally. Exact direct versions from npm lockfiles are preferred over version ranges. By default it scans `dependencies` and `optionalDependencies`; add `--include-dev` for `devDependencies`.
+
+```text
+! npx-vibe project: Caution  highest risk 43/100
+my-app@1.0.0
+
+Scanned: 12/12 direct dependencies  Proceed: 11  Caution: 1  Block: 0
+Scope: dependencies + optionalDependencies
+Resolution: exact versions from package-lock.json when available
+AI review: off (heuristic-only)
+
+Packages:
+- CAUTION  43/100  esbuild@0.28.1
+  young_version, lifecycle_hook, network_and_shell
+
+No dependency or package code was executed during this project scan.
+Action: review the flagged dependencies and their evidence individually.
+```
+
+The workflow is deliberately bounded:
+
+- Only direct registry dependencies are scanned; transitive dependency graph analysis is not claimed.
+- Workspace, local, alias, URL, and Git specs are reported as skipped rather than uploaded or resolved through another trust path.
+- Heuristic-only scans use three concurrent reviews by default (`--concurrency 1-8`).
+- If AI is opted in, reviews are sequential and only heuristic-triggered packages call the model. The default budget is three calls (`--ai-limit 0-100`).
+- `package.json` and `package-lock.json` are never sent to an AI provider. Optional online AI receives only bounded files selected from the downloaded registry package.
+
+This is autonomous triage rather than autonomous execution: discover, resolve, verify, inspect, escalate when requested, and aggregate. It never installs dependencies or edits the project.
 
 ## AI is optional and opt-in
 
@@ -310,11 +370,36 @@ Provider catalogs change independently of `npx-vibe`. The resolved model is alwa
 
 ## Automation and CI
 
-Use JSON plus exit codes in CI or local automation:
+Use JSON plus exit codes in local automation:
 
 ```bash
 npx npx-vibe --json <package> > npx-vibe-report.json
+npx npx-vibe --project . --json > npx-vibe-project-report.json
 ```
+
+For GitHub Actions, `--ci` emits a warning for each Caution result, an error for each Block or operational failure, and writes a package table to the job summary:
+
+```yaml
+name: Dependency preflight
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  npx-vibe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npx --yes npx-vibe@1.3.0 --project . --include-dev --ci
+```
+
+Project mode preserves the normal exit contract: `0` Proceed, `2` Caution, `3` Block, and `1` for an incomplete scan caused by an operational error. `--ci` and `--json` are intentionally separate so JSON output remains valid.
 
 The repository tests Node.js 20, 22, and 24 across Linux, Windows, and macOS. CI also packs the npm tarball, installs it into a clean temporary consumer project, and exercises the shipped CLI.
 
@@ -337,11 +422,13 @@ NPX_VIBE_AGE_DAYS=14
 NPX_VIBE_DOWNLOADS=1000
 NPX_VIBE_CAUTION_SCORE=40
 NPX_VIBE_BLOCK_SCORE=70
+NPX_VIBE_CONCURRENCY=3
+NPX_VIBE_AI_LIMIT=3
 ```
 
 ## Supported scope
 
-`npx-vibe` supports public npm registry package names, scoped packages, dist-tags, exact versions, and common semver ranges. It intentionally rejects local paths, arbitrary tarball URLs, and Git URLs to keep the trust boundary narrow.
+`npx-vibe` supports public npm registry package names, scoped packages, dist-tags, exact versions, common semver ranges, and direct dependency discovery from npm package manifests and lockfiles. It intentionally rejects local paths, arbitrary tarball URLs, Git URLs, and non-registry project dependencies to keep the trust boundary narrow.
 
 Node.js 20 or newer is required. The project is tested on current Windows, macOS, and Linux GitHub-hosted runners.
 

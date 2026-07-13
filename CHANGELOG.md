@@ -2,11 +2,24 @@
 
 All notable changes to `npx-vibe` are documented here.
 
-## Unreleased
+## 1.3.0 - 2026-07-13
 
 ### Added
 
 - `--bin <name>` selects a specific executable from packages that expose multiple binaries, with actionable validation when the name is unavailable.
+- `--project <path>` scans direct registry dependencies from an existing `package.json` without executing dependency or package code.
+- Lockfile-aware resolution uses exact direct versions from npm `package-lock.json` v1-v3 when available.
+- `--include-dev` adds `devDependencies` to project scans; production and optional dependencies remain the default scope.
+- `--ci` emits GitHub Actions warnings/errors and writes a Markdown job summary.
+- `--concurrency` controls key-free heuristic scan concurrency, while `--ai-limit` bounds triggered AI reviews and avoids surprise project-scan costs.
+
+### Changed
+
+- Project scans skip workspace, local, alias, URL, and Git dependencies explicitly instead of crossing the registry-only trust boundary.
+- Project scans omit per-package GitHub API enrichment to remain fast and avoid unauthenticated rate limits.
+- Concurrent scans merge integrity-keyed review history safely instead of allowing stale writers to drop another package's record.
+- Common semver ranges using `||` are now resolved correctly.
+- Packed-install smoke tests now exercise the shipped project-scan workflow.
 
 ## 1.2.0 - 2026-06-25
 

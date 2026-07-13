@@ -29,8 +29,8 @@ The workflow lives at `.github/workflows/release.yml` and requests only `content
 4. Create and push the matching tag:
 
    ```bash
-   git tag v1.2.0
-   git push origin v1.2.0
+   git tag v1.3.0
+   git push origin v1.3.0
    ```
 
 The release workflow verifies that the tag matches `package.json`, installs and tests the packed artifact, publishes with npm provenance, and creates a GitHub Release.

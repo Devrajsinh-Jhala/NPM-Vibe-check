@@ -4,7 +4,7 @@ import { buildPackageProfile } from "./profile.js";
 
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 const DEFAULT_DOWNLOADS_API = "https://api.npmjs.org/downloads/point/last-week";
-const USER_AGENT = "npx-vibe/1.2.0 (+https://www.npmjs.com/package/npx-vibe)";
+const USER_AGENT = "npx-vibe/1.3.0 (+https://www.npmjs.com/package/npx-vibe)";
 
 export async function loadPackageSnapshot(spec, options = {}) {
   const registry = stripTrailingSlash(options.registry ?? DEFAULT_REGISTRY);

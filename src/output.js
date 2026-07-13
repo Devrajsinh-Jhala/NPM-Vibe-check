@@ -93,6 +93,176 @@ export function toJsonResult(result) {
   return JSON.stringify(result, null, 2);
 }
 
+export function renderProjectDashboard(scan, options = {}) {
+  const color = createColor(Boolean(options.color));
+  const verdict = scan.verdict.verdict;
+  const incomplete = scan.errors.length > 0;
+  const headline = incomplete
+    ? color.red("Incomplete")
+    : verdict === "proceed"
+    ? color.green("Proceed")
+    : verdict === "caution"
+      ? color.yellow("Caution")
+      : color.red("Block");
+  const symbol = incomplete ? "!" : SYMBOLS[verdict];
+  const version = scan.project.version ? `@${scan.project.version}` : "";
+  const lines = [
+    `${symbol} npx-vibe project: ${headline}  ${color.dim(`highest risk ${scan.verdict.score}/100`)}`,
+    `${scan.project.name}${version}`,
+    color.dim(scan.project.manifestPath),
+    "",
+    `Scanned: ${scan.summary.scanned}/${scan.summary.discovered} direct dependencies  ` +
+      `Proceed: ${scan.summary.proceed}  Caution: ${scan.summary.caution}  Block: ${scan.summary.block}`,
+    `Scope: dependencies + optionalDependencies${scan.project.includeDev ? " + devDependencies" : ""}`,
+    `Resolution: ${scan.project.lockfilePath
+      ? "exact versions from package-lock.json when available"
+      : scan.project.lockfileError
+        ? "package.json ranges (package-lock.json could not be read)"
+        : "package.json ranges (no package-lock.json found)"}`,
+  ];
+
+  if (scan.project.lockfileError) {
+    lines.push(color.yellow(`Lockfile warning: ${trim(scan.project.lockfileError, 180)}`));
+  }
+  if (scan.ai.enabled) {
+    lines.push(`AI budget: ${scan.ai.attempted}/${scan.ai.limit} triggered ${pluralize("review", scan.ai.attempted)}` +
+      `${scan.ai.suppressed ? `; ${scan.ai.suppressed} additional trigger(s) used heuristics only` : ""}`);
+  } else {
+    lines.push("AI review: off (heuristic-only)");
+  }
+
+  if (scan.packages.length) {
+    lines.push("", "Packages:");
+    const packages = [...scan.packages].sort((left, right) =>
+      Number(right.verdict.score) - Number(left.verdict.score) || left.package.name.localeCompare(right.package.name)
+    );
+    for (const result of packages) {
+      const label = result.verdict.verdict.toUpperCase().padEnd(7);
+      const styled = result.verdict.verdict === "block"
+        ? color.red(label)
+        : result.verdict.verdict === "caution"
+          ? color.yellow(label)
+          : color.green(label);
+      const findings = prioritizedFindings(result.findings);
+      const signals = findings.slice(0, 3).map((finding) => finding.code).join(", ") || "no deterministic findings";
+      lines.push(`- ${styled} ${String(result.verdict.score).padStart(3)}/100  ${result.package.name}@${result.package.version}`);
+      lines.push(color.dim(`  ${signals}`));
+      if (result.verdict.verdict !== "proceed") {
+        for (const finding of findings.slice(0, 2)) {
+          lines.push(`  ${finding.code}${finding.file ? ` in ${finding.file}` : ""}: ${trim(finding.detail, 150)}`);
+          const evidence = finding.evidence?.[0];
+          if (evidence?.excerpt) {
+            lines.push(color.dim(`  Evidence${evidence.line ? ` line ${evidence.line}` : ""}: ${trim(evidence.excerpt, 150)}`));
+          }
+        }
+      }
+    }
+  }
+
+  if (scan.skipped.length) {
+    lines.push("", "Skipped:");
+    for (const dependency of scan.skipped.slice(0, 10)) {
+      lines.push(`- ${dependency.name}@${dependency.requested}: ${dependency.reason}`);
+    }
+    if (scan.skipped.length > 10) {
+      lines.push(`- ... ${scan.skipped.length - 10} more skipped dependencies`);
+    }
+  }
+
+  if (scan.errors.length) {
+    lines.push("", "Errors:");
+    for (const error of scan.errors.slice(0, 10)) {
+      lines.push(color.red(`- ${error.name}@${error.requested}: ${trim(error.message, 200)}`));
+    }
+  }
+
+  lines.push("", color.dim("No dependency or package code was executed during this project scan."));
+  if (scan.errors.length) {
+    lines.push(color.red("Action: fix scan errors before relying on the aggregate verdict."));
+  } else if (verdict === "proceed") {
+    lines.push(color.green("Action: no reviewable direct dependency triggered Caution or Block."));
+  } else if (verdict === "caution") {
+    lines.push(color.yellow("Action: review the flagged dependencies and their evidence individually."));
+  } else {
+    lines.push(color.red("Action: investigate blocked dependencies before install or execution."));
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function renderGitHubActionsAnnotations(scan) {
+  const lines = [];
+  for (const result of scan.packages) {
+    if (result.verdict.verdict === "proceed") {
+      continue;
+    }
+    const level = result.verdict.verdict === "block" ? "error" : "warning";
+    const signals = prioritizedFindings(result.findings).slice(0, 3).map((finding) => finding.code).join(", ") || "review required";
+    const title = escapeWorkflowProperty(`npx-vibe: ${result.package.name}`);
+    const message = escapeWorkflowMessage(
+      `${capitalize(result.verdict.verdict)} ${result.verdict.score}/100 for ${result.package.name}@${result.package.version}: ${signals}`
+    );
+    lines.push(`::${level} title=${title}::${message}`);
+  }
+  for (const error of scan.errors) {
+    lines.push(`::error title=${escapeWorkflowProperty(`npx-vibe: ${error.name}`)}::${escapeWorkflowMessage(error.message)}`);
+  }
+  return lines.length ? `${lines.join("\n")}\n` : "";
+}
+
+export function renderProjectMarkdownSummary(scan) {
+  const title = `npx-vibe: ${scan.errors.length ? "Incomplete" : capitalize(scan.verdict.verdict)}`;
+  const lines = [
+    `## ${title}`,
+    "",
+    `Scanned **${scan.summary.scanned}** of **${scan.summary.discovered}** direct dependencies without executing package code.`,
+    "",
+    `- Proceed: **${scan.summary.proceed}**`,
+    `- Caution: **${scan.summary.caution}**`,
+    `- Block: **${scan.summary.block}**`,
+    `- Skipped: **${scan.summary.skipped}**`,
+    `- Errors: **${scan.summary.errors}**`,
+    "",
+    "| Package | Resolved version | Verdict | Risk | Signals |",
+    "| --- | --- | --- | ---: | --- |",
+  ];
+
+  const packages = [...scan.packages].sort((left, right) =>
+    Number(right.verdict.score) - Number(left.verdict.score) || left.package.name.localeCompare(right.package.name)
+  );
+  for (const result of packages) {
+    const signals = prioritizedFindings(result.findings).slice(0, 3).map((finding) => finding.code).join(", ") || "none";
+    lines.push(`| ${markdownCell(result.package.name)} | ${markdownCell(result.package.version)} | ${capitalize(result.verdict.verdict)} | ${result.verdict.score}/100 | ${markdownCell(signals)} |`);
+  }
+  if (!packages.length) {
+    lines.push("| _No registry dependencies scanned_ | - | Proceed | 0/100 | none |");
+  }
+  lines.push("");
+  if (scan.skipped.length) {
+    lines.push("Skipped non-registry dependencies are listed in the CLI and JSON output.", "");
+  }
+  lines.push("_A npx-vibe verdict is a review aid, not proof that a package is safe or malicious._", "");
+  return lines.join("\n");
+}
+
+function escapeWorkflowMessage(value) {
+  return String(value).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+}
+
+function escapeWorkflowProperty(value) {
+  return escapeWorkflowMessage(value).replace(/:/g, "%3A").replace(/,/g, "%2C");
+}
+
+function markdownCell(value) {
+  return String(value ?? "").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
+}
+
+function prioritizedFindings(findings = []) {
+  const ranks = { critical: 4, high: 3, medium: 2, low: 1 };
+  return [...findings].sort((left, right) =>
+    (ranks[right.severity] ?? 0) - (ranks[left.severity] ?? 0)
+  );
+}
+
 function profileLines(result) {
   const profile = result.profile ?? {};
   const lines = [];
