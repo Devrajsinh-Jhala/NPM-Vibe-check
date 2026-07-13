@@ -3,34 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>npx-vibe &mdash; inspect npm packages and project dependencies</title>
+    <title>npx-vibe &mdash; npm package preflight for developers and coding agents</title>
     <meta
       name="description"
-      content="npx-vibe is an evidence-first safety checkpoint for npm packages and project dependencies. Verify tarballs, inspect install behavior, and review source-backed findings before execution."
+      content="npx-vibe is an evidence-first npm safety checkpoint for developers and coding agents. Verify tarballs, inspect install behavior, and get versioned decisions before execution."
     />
-    <meta property="og:title" content="Inspect npm packages and project dependencies" />
+    <meta property="og:title" content="Inspect npm packages before developers or agents execute them" />
     <meta
       property="og:description"
-      content="A lightweight, read-only checkpoint for npm packages and direct project dependencies with deterministic checks and optional AI review."
+      content="A lightweight, read-only checkpoint for npm packages and direct project dependencies with deterministic checks, agent-ready JSON, and optional AI review."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
     <meta
       property="og:image"
-      content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/assets/npx-vibe-demo-poster.png"
+      content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/assets/npx-vibe-agent-demo-poster.png"
     />
     <meta
       property="og:image:alt"
-      content="npx-vibe reviewing the esbuild package before execution"
+      content="npx-vibe returning a versioned package preflight decision to a coding agent"
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#f4f7f6" />
     <link rel="canonical" href="https://devrajsinh-jhala.github.io/NPM-Vibe-check/" />
+    <link rel="alternate" type="text/plain" href="./llms.txt" title="Agent-readable documentation" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://api.npmjs.org" crossorigin />
     <script>document.documentElement.classList.add("js");</script>
-    <link rel="stylesheet" href="./landing.css?v=project-20260713" />
-    <script src="./app.js?v=project-20260713" defer></script>
+    <link rel="stylesheet" href="./landing.css?v=agent-20260713" />
+    <script src="./app.js?v=agent-20260713" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -42,10 +43,10 @@
 
         <div class="nav-links">
           <a href="#workflow">How it works</a>
+          <a href="#agents">For agents</a>
           <a href="#project">Project scan</a>
           <a href="#evidence">Evidence</a>
-          <a href="#demo">Reports</a>
-          <a href="#ai">AI review</a>
+          <a href="#demo">Demos</a>
         </div>
 
         <div class="nav-actions">
@@ -64,7 +65,7 @@
             <p class="hero-lead">
               Review one unfamiliar package or preflight every direct dependency in a project.
               npx-vibe verifies registry tarballs, inspects install-time behavior, and shows the
-              evidence behind every Proceed, Caution, or Block verdict.
+              evidence behind every Proceed, Caution, or Block verdict&mdash;for humans and coding agents.
             </p>
 
             <div class="command-bar" aria-label="Project dependency scan command">
@@ -80,8 +81,9 @@
 
             <div class="hero-signals" aria-label="Product facts">
               <span><strong>0</strong> runtime dependencies</span>
-              <span><strong>47</strong> automated checks</span>
+              <span><strong>55</strong> automated checks</span>
               <span><strong>Opt-in</strong> AI review</span>
+              <span><strong>Schema v1</strong> agent output</span>
             </div>
           </div>
 
@@ -163,6 +165,68 @@
             <p>Read a source-backed verdict, then choose whether the package should execute.</p>
           </li>
         </ol>
+      </section>
+
+      <section id="agents" class="agent-shell">
+        <div class="container agent-heading" data-reveal>
+          <div>
+            <p class="eyebrow eyebrow-light">Built for coding agents</p>
+            <h2>Give every package action a safety gate.</h2>
+          </div>
+          <p>
+            The portable Agent Skill teaches compatible coding agents to scan unfamiliar npm
+            packages before installation or execution. A normalized decision tells the agent when
+            to continue, pause for review, stop, or retry an incomplete scan.
+          </p>
+        </div>
+
+        <div class="container agent-layout">
+          <figure class="agent-demo-card" data-reveal>
+            <div class="agent-demo-label">
+              <span><i></i> Agent package preflight</span>
+              <span>schema v1</span>
+            </div>
+            <picture>
+              <source
+                media="(prefers-reduced-motion: reduce)"
+                srcset="./assets/npx-vibe-agent-demo-poster.png"
+              />
+              <img
+                src="./assets/npx-vibe-agent-demo.gif"
+                width="1200"
+                height="675"
+                loading="lazy"
+                decoding="async"
+                alt="Animated coding-agent preflight showing npx-vibe resolving and verifying esbuild, returning a versioned Caution decision, and pausing before execution"
+              />
+            </picture>
+            <figcaption>Real command shape. Representative, abbreviated output.</figcaption>
+          </figure>
+
+          <div class="agent-guide" data-reveal>
+            <div class="skill-install">
+              <span>Install the Agent Skill</span>
+              <code>npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g</code>
+              <button type="button" data-copy="npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g">Copy</button>
+            </div>
+
+            <ol class="agent-policy">
+              <li><span>01</span><div><strong>Preflight</strong><p>Resolve, verify, and inspect without running package code.</p></div></li>
+              <li><span>02</span><div><strong>Read one decision</strong><p><code>continue</code>, <code>review</code>, <code>stop</code>, or <code>retry</code>.</p></div></li>
+              <li><span>03</span><div><strong>Keep humans in control</strong><p>Caution requires approval. Block and incomplete scans stop the workflow.</p></div></li>
+            </ol>
+
+            <div class="agent-commands">
+              <div><span>One package</span><code>npx --yes npx-vibe@latest --agent esbuild</code></div>
+              <div><span>Whole project</span><code>npx --yes npx-vibe@latest --agent --project .</code></div>
+            </div>
+
+            <div class="agent-links">
+              <a class="button button-light" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/tree/master/skills/npx-vibe">Read the Agent Skill</a>
+              <a href="./llms.txt">Agent-readable docs <span>&rarr;</span></a>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="project" class="project-shell">
@@ -251,9 +315,9 @@ No dependency or package code was executed.</code></pre>
         <div class="reports-heading" data-reveal>
           <div>
             <p class="eyebrow">Representative output</p>
-            <h2>Read the evidence, not a black box.</h2>
+            <h2>See the same evidence humans and agents receive.</h2>
           </div>
-          <p>Compare the report shape for clean packages, install hooks, optional AI, and synthetic malicious behavior.</p>
+          <p>Compare clean packages, install hooks, optional AI, agent JSON, and synthetic malicious behavior.</p>
         </div>
 
         <div class="report-explorer" data-reveal>
@@ -266,6 +330,9 @@ No dependency or package code was executed.</code></pre>
             </button>
             <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo="ai">
               <span>AI review</span><small>optional context</small>
+            </button>
+            <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo="agent">
+              <span>Agent JSON</span><small>stable decision</small>
             </button>
             <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo="block">
               <span>Block</span><small>synthetic fixture</small>
@@ -326,9 +393,9 @@ No dependency or package code was executed.</code></pre>
               <button type="button" data-copy="npx npx-vibe --check <package>">Copy</button>
             </div>
             <div class="copy-command">
-              <span>Install globally</span>
-              <code>npm install -g npx-vibe</code>
-              <button type="button" data-copy="npm install -g npx-vibe">Copy</button>
+              <span>Install Agent Skill</span>
+              <code>npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g</code>
+              <button type="button" data-copy="npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g">Copy</button>
             </div>
           </div>
         </div>
@@ -353,6 +420,7 @@ No dependency or package code was executed.</code></pre>
         <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
         <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/SECURITY.md">Security</a>
         <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/CHANGELOG.md">Changelog</a>
+        <a href="./llms.txt">llms.txt</a>
       </div>
     </footer>
   </body>
