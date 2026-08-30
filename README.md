@@ -225,10 +225,10 @@ Action: review recommended before execution.
 | Area | Signals |
 | --- | --- |
 | Registry context | package age, version age, weekly downloads, maintainers, publisher, license, deprecation |
-| Install behavior | `preinstall`, `install`, `postinstall`, `prepare`, and related script targets |
+| Install behavior | `preinstall`, `install`, `postinstall`, and their script targets. `prepare`, `prepublish`, `preprepare`, and `postprepare` are reported separately as context, because npm does not run them when a published tarball is installed |
 | Tarball safety | npm integrity verification, unsafe paths, escaping symlinks, archive size and entry limits |
 | Source behavior | secret/environment access, network calls, shell execution, external payloads, obfuscation, persistence, mining indicators |
-| Dependency metadata | remote Git/HTTP/file dependency protocols and lockfile install-script indicators |
+| Dependency metadata | remote Git/HTTP/file protocols in the fields npm actually installs, and lockfile install-script indicators |
 | Repository context | GitHub repository, stars, last update, last push, and latest commit |
 | Review memory | verified integrity match, previous verdict, selected-file changes, lifecycle-hook changes, and finding deltas |
 | Optional AI | local Ollama or supported online providers, used only after explicit opt-in and a heuristic trigger |
@@ -290,6 +290,9 @@ npx npx-vibe --bin tsc typescript -- --version
 # Scan production and optional dependencies from this project
 npx npx-vibe --project .
 
+# Scan the whole installed tree from package-lock.json
+npx-vibe --project . --transitive
+
 # Include direct development dependencies
 npx npx-vibe --project . --include-dev
 
@@ -318,6 +321,8 @@ Useful options:
 --mcp
 --project <path>
 --include-dev
+--transitive
+--max-packages <1-5000>
 --ci
 --concurrency <1-8>
 --ai-limit <0-100>
@@ -354,7 +359,13 @@ Project mode turns the one-package review into a repeatable dependency preflight
 npx npx-vibe --project .
 ```
 
-It reads `package.json` and, when present, `package-lock.json` locally. Exact direct versions from npm lockfiles are preferred over version ranges. By default it scans `dependencies` and `optionalDependencies`; add `--include-dev` for `devDependencies`.
+It reads `package.json` and, when present, `package-lock.json` locally. Exact versions from npm lockfiles are preferred over version ranges. By default it scans direct `dependencies` and `optionalDependencies`; add `--include-dev` for `devDependencies`.
+
+Add `--transitive` to review every registry-resolved package in `package-lock.json` rather than only the direct ones. Supply-chain compromises usually arrive through a transitive dependency, so this is the broader check, at the cost of many more registry lookups:
+
+```bash
+npx npx-vibe --project . --transitive
+```
 
 ```text
 ! npx-vibe project: Caution  highest risk 43/100
@@ -375,9 +386,10 @@ Action: review the flagged dependencies and their evidence individually.
 
 The workflow is deliberately bounded:
 
-- Only direct registry dependencies are scanned; transitive dependency graph analysis is not claimed.
+- Direct registry dependencies are scanned by default. `--transitive` walks the whole installed tree from `package-lock.json`; without a lockfile it is an error rather than a partial answer.
+- `--max-packages` (default 500) caps how many packages one scan reviews. Anything past the cap is reported as skipped, never silently dropped.
 - Workspace, local, alias, URL, and Git specs are reported as skipped rather than uploaded or resolved through another trust path.
-- Heuristic-only scans use three concurrent reviews by default (`--concurrency 1-8`).
+- Heuristic-only scans use three concurrent reviews by default (`--concurrency 1-8`). Weekly download counts for the whole scan are fetched through npm's bulk endpoint in a single request.
 - If AI is opted in, reviews are sequential and only heuristic-triggered packages call the model. The default budget is three calls (`--ai-limit 0-100`).
 - `package.json` and `package-lock.json` are never sent to an AI provider. Optional online AI receives only bounded files selected from the downloaded registry package.
 
@@ -545,17 +557,21 @@ NPX_VIBE_CAUTION_SCORE=40
 NPX_VIBE_BLOCK_SCORE=70
 NPX_VIBE_CONCURRENCY=3
 NPX_VIBE_AI_LIMIT=3
+NPX_VIBE_MAX_PACKAGES=500
+GITHUB_TOKEN=                # optional; raises the GitHub metadata rate limit
 ```
 
 ## Supported scope
 
-`npx-vibe` supports public npm registry package names, scoped packages, dist-tags, exact versions, common semver ranges, and direct dependency discovery from npm package manifests and lockfiles. It intentionally rejects local paths, arbitrary tarball URLs, Git URLs, and non-registry project dependencies to keep the trust boundary narrow.
+`npx-vibe` supports public npm registry package names, scoped packages, dist-tags, exact versions, common semver ranges, and dependency discovery from npm package manifests and lockfiles, including the full transitive tree with `--transitive`. Version ranges resolve to stable releases unless the range itself names a prerelease, matching npm. It intentionally rejects local paths, arbitrary tarball URLs, Git URLs, and non-registry project dependencies to keep the trust boundary narrow.
 
 Node.js 20 or newer is required. The project is tested on current Windows, macOS, and Linux GitHub-hosted runners.
 
 ## Security boundary
 
-`npx-vibe` is a pre-execution risk scanner. It is not a sandbox, antivirus engine, formal audit, or guarantee of safety. A package may hide behavior in unselected files, dependencies, runtime branches, native code, or remote responses.
+`npx-vibe` is a pre-execution risk scanner. It is not a sandbox, antivirus engine, formal audit, or guarantee of safety. A package may hide behavior in unselected files, runtime branches, native code, or remote responses.
+
+Review coverage is bounded and reported rather than implied. Files are selected from the install and executable entry points and the imports reachable from them; each selected file is read up to 64 KiB, and the scan stops selecting once the byte budget is reached. The dashboard names how many files were read only in part or left past the budget, so a large bundled file is never mistaken for a fully reviewed one.
 
 - Treat **Proceed** as a useful signal, not proof.
 - Read the evidence for **Caution** findings.

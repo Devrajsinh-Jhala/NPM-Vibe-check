@@ -2,6 +2,36 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## Unreleased
+
+### Fixed
+
+- A critical `possible_secret_exfiltration` finding no longer fires on any environment read plus any network signal in the same file. The two must now be part of the same code path, appear in an install script, or sit in an install-related file. Unrelated matches are reported as a low `env_access_and_network` finding instead. This hard-Blocked vite, rollup, and npm-check-updates on fragments hundreds of lines apart, and a critical finding is unrecoverable because it short-circuits the verdict ahead of any AI review.
+- Bare URLs no longer count as network activity for `network_and_shell` or as an escalation for `obfuscated_code`. Every `package.json` carries a repository URL, so the signal was always present.
+- The shell environment-dump pattern is anchored to a command boundary and requires a pipe or redirect. It previously matched `offset|0` and `charset>` in ordinary JavaScript.
+- `prepare`, `prepublish`, `preprepare`, and `postprepare` are reported as `publish_lifecycle_hook` at low severity. npm does not run them when a published tarball is installed, so they no longer raise Caution or spend an AI call.
+- A dependency's own `devDependencies` and `peerDependencies` are no longer checked for unusual protocols. npm never installs them for the consumer.
+- Request timeouts now cover the response body. The abort timer was cleared as soon as headers arrived, leaving every body read untimed and unbounded.
+- Tarball downloads are streamed with a 100 MiB cap, and decompression is bounded by `maxOutputLength` instead of being checked after the fact.
+- Review memory is written through a temp file and rename, so concurrent project scans cannot read a half-written file. The rename also enforces `0600` on every write.
+- The selected-file byte budget is enforced. It was computed and then discarded, so only the file count ever limited what was reviewed.
+- Version ranges resolve to stable releases unless the range names a prerelease. `^1.0.0` could resolve to `1.3.0-beta.1` over a published `1.2.0`.
+- Weekly download counts for a project scan are fetched through npm's bulk endpoint. One request per package rate-limited partway through a large scan and produced spurious `downloads_unavailable` findings.
+- MCP requests are dispatched concurrently, bounded at four. A long `scan_project` previously blocked every later request, including `ping`.
+- An MCP `package` argument beginning with `-` is rejected instead of being reinterpreted as a command-line flag.
+
+### Added
+
+- `--transitive` and the MCP `transitive` argument scan every registry-resolved package in `package-lock.json`, not only the direct dependencies. Workspace links, git resolutions, and non-registry protocols stay outside the trust boundary.
+- `--max-packages` (default 500, `NPX_VIBE_MAX_PACKAGES`) caps one project scan. Packages past the cap are reported as skipped.
+- The dashboard reports review coverage: files read only in part, files left past the review budget, and publish hooks that npm does not run on install.
+- `GITHUB_TOKEN`, `GH_TOKEN`, or `NPX_VIBE_GITHUB_TOKEN` raises the GitHub metadata rate limit, which unauthenticated CI runners exhaust quickly.
+
+### Changed
+
+- The default Anthropic `max_tokens` is 4000, so a full findings array is not truncated into invalid JSON.
+- The HTTP user agent is read from `package.json` rather than a hardcoded version string.
+
 ## 1.5.1 - 2026-07-13
 
 ### Fixed

@@ -22,6 +22,10 @@ Inspect direct registry dependencies in the current project:
 
     npx --yes npx-vibe@latest --agent --project .
 
+Inspect the whole installed tree from package-lock.json:
+
+    npx --yes npx-vibe@latest --agent --project . --transitive
+
 Install the portable Agent Skill:
 
     npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g

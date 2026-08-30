@@ -12,7 +12,7 @@ Inspect npm registry packages before allowing installation or execution. Treat t
 When the `npx-vibe` MCP server is connected, use its native tools instead of launching a shell command:
 
 - `scan_package` for one npm package spec.
-- `scan_project` for direct registry dependencies from a project manifest.
+- `scan_project` for registry dependencies from a project manifest; pass `transitive` to cover the whole lockfile tree.
 - `list_models` before selecting an optional AI model.
 
 Keep AI off unless the user explicitly asks for it or an established workflow requires it. MCP tool calls never accept API keys; provider credentials must come from the server environment.
@@ -33,7 +33,9 @@ For the current project's direct registry dependencies:
 npx --yes npx-vibe@latest --agent --project .
 ```
 
-Add `--include-dev` only when development dependencies are in scope. The outer `npx --yes` suppresses npm's package-download prompt; do not pass `--yes` or `--force` to `npx-vibe` itself.
+Add `--include-dev` only when development dependencies are in scope. Add `--transitive` when the whole installed tree matters rather than the direct dependencies alone; it needs a `package-lock.json` and reviews many more packages, so prefer it for a deliberate audit rather than a routine check.
+
+The outer `npx --yes` suppresses npm's package-download prompt; do not pass `--yes` or `--force` to `npx-vibe` itself.
 
 ## Apply the decision
 
