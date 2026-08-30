@@ -228,3 +228,48 @@ function packageResult(verdict, score) {
     execution: { npmPackage: "esbuild@0.28.1", bin: "esbuild", installScripts: "ignored", binError: null },
   };
 }
+
+test("a slow scan does not block later MCP requests", async () => {
+  let releaseScan;
+  const scanStarted = new Promise((resolve) => {
+    releaseScan = resolve;
+  });
+  const server = new NpxVibeMcpServer({
+    version: "9.9.9",
+    env: {},
+    reviewPackage: async () => {
+      await scanStarted;
+      return { result: packageResult("proceed", 0) };
+    },
+  });
+
+  const responses = [];
+  const output = { write: (chunk) => responses.push(JSON.parse(chunk)) };
+  const input = new PassThrough();
+  const running = startMcpServer({ input, output, server });
+
+  input.write(`${JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: "scan_package", arguments: { package: "slow-package" } },
+  })}\n`);
+  input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" })}\n`);
+
+  // The ping must be answered while the scan is still in flight.
+  await waitFor(() => responses.length === 1);
+  assert.equal(responses[0].id, 2);
+
+  releaseScan();
+  input.end();
+  await running;
+
+  assert.deepEqual(responses.map((response) => response.id), [2, 1]);
+});
+
+async function waitFor(predicate) {
+  for (let attempt = 0; attempt < 200 && !predicate(); attempt += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.ok(predicate(), "condition was not met before the timeout");
+}

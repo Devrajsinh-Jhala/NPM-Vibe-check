@@ -246,7 +246,9 @@ export function parseArgs(argv, env = process.env) {
     projectPath: undefined,
     projectConcurrency: boundedIntegerFromEnv(env.NPX_VIBE_CONCURRENCY, 3, 1, 8),
     projectAiLimit: boundedIntegerFromEnv(env.NPX_VIBE_AI_LIMIT, 3, 0, 100),
+    projectMaxPackages: boundedIntegerFromEnv(env.NPX_VIBE_MAX_PACKAGES, 500, 1, 5_000),
     includeDev: false,
+    transitive: false,
     ci: false,
     agent: false,
     check: false,
@@ -312,6 +314,12 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--include-dev":
           config.includeDev = true;
+          break;
+        case "--transitive":
+          config.transitive = true;
+          break;
+        case "--max-packages":
+          config.projectMaxPackages = boundedIntegerFlag(parsed.name, readValue(), 1, 5_000);
           break;
         case "--ci":
           config.ci = true;
@@ -430,6 +438,10 @@ export function parseArgs(argv, env = process.env) {
 
   if (config.includeDev && !config.projectPath) {
     throw new Error("--include-dev requires --project <path>.");
+  }
+
+  if (config.transitive && !config.projectPath) {
+    throw new Error("--transitive requires --project <path>.");
   }
 
   if (config.ci && !config.projectPath) {
@@ -622,6 +634,7 @@ function argvRequestsAgent(argv) {
     "--model-profile", "--api-key", "--api-url", "--ollama-url", "--ollama-model",
     "--registry", "--bin", "--age-days", "--downloads", "--caution-score",
     "--block-score", "--timeout-ms", "--ai-timeout-ms", "--max-ai-chars", "--history-file",
+    "--max-packages",
   ]);
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -676,6 +689,7 @@ Examples:
   npx-vibe --bin tsc typescript -- --version
   npx-vibe --project .
   npx-vibe --project . --include-dev --json
+  npx-vibe --project . --transitive
   npx-vibe --agent --project .
   npx-vibe --mcp
   npx-vibe --project . --ci
@@ -694,6 +708,8 @@ Options:
   --mcp                      Start the read-only MCP server over stdio
   --project <path>           Scan direct registry dependencies without executing them
   --include-dev              Include devDependencies in a project scan
+  --transitive               Scan the whole installed tree from package-lock.json
+  --max-packages <1-5000>    Cap packages scanned in a project; default 500
   --ci                       Emit GitHub Actions annotations and a job summary
   --concurrency <1-8>        Heuristic project-scan concurrency; default 3
   --ai-limit <0-100>         Maximum triggered AI reviews per project scan; default 3

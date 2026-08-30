@@ -13,6 +13,7 @@ export const MCP_SUPPORTED_PROTOCOL_VERSIONS = [
 ];
 
 const MAX_MESSAGE_BYTES = 10 * 1024 * 1024;
+const MAX_CONCURRENT_REQUESTS = 4;
 const JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema";
 const AI_MODES = ["off", "auto", "online", "ollama"];
 const PROVIDERS = ["auto", "openai", "anthropic", "gemini", "openrouter", "groq", "together", "custom"];
@@ -119,7 +120,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "scan_project",
     title: "Scan project dependencies",
-    description: "Inspect direct public-registry dependencies from package.json and package-lock.json without installing or executing them. Use after dependency or lockfile changes and before installation.",
+    description: "Inspect public-registry dependencies from package.json and package-lock.json without installing or executing them. Direct dependencies by default; set transitive to walk the whole installed tree. Use after dependency or lockfile changes and before installation.",
     inputSchema: {
       $schema: JSON_SCHEMA,
       type: "object",
@@ -133,7 +134,19 @@ const TOOL_DEFINITIONS = [
         includeDev: {
           type: "boolean",
           default: false,
-          description: "Include direct devDependencies in addition to production and optional dependencies.",
+          description: "Include devDependencies in addition to production and optional dependencies.",
+        },
+        transitive: {
+          type: "boolean",
+          default: false,
+          description: "Scan every registry-resolved package in package-lock.json, not only direct dependencies. Requires a lockfile and scans many more packages.",
+        },
+        maxPackages: {
+          type: "integer",
+          minimum: 1,
+          maximum: 5000,
+          default: 500,
+          description: "Maximum packages scanned in one project scan.",
         },
         concurrency: {
           type: "integer",
@@ -284,6 +297,11 @@ export class NpxVibeMcpServer {
     validateArguments(args, new Set(["package", "ai", "provider", "modelProfile", "model"]), {
       requiredStrings: ["package"],
     });
+    // The spec is handed to the CLI parser as a positional, so a value starting
+    // with "-" would be reinterpreted as a flag rather than a package name.
+    if (args.package.trim().startsWith("-")) {
+      throw new McpProtocolError(-32602, "package must be an npm package spec, not a command-line flag.");
+    }
     const config = createScanConfig(args, "package", this.env, this.cwd);
 
     try {
@@ -304,13 +322,15 @@ export class NpxVibeMcpServer {
 
   async scanProjectTool(args) {
     validateArguments(args, new Set([
-      "path", "includeDev", "concurrency", "aiLimit", "ai", "provider", "modelProfile", "model",
+      "path", "includeDev", "transitive", "maxPackages", "concurrency", "aiLimit",
+      "ai", "provider", "modelProfile", "model",
     ]), {
       optionalStrings: ["path"],
-      booleans: ["includeDev"],
+      booleans: ["includeDev", "transitive"],
       boundedIntegers: {
         concurrency: [1, 8],
         aiLimit: [0, 100],
+        maxPackages: [1, 5000],
       },
     });
     const config = createScanConfig(args, "project", this.env, this.cwd);
@@ -345,8 +365,26 @@ export class NpxVibeMcpServer {
 export async function startMcpServer(options = {}) {
   const input = options.input ?? process.stdin;
   const output = options.output ?? process.stdout;
+  const errorOutput = options.errorOutput ?? process.stderr;
   const server = options.server ?? new NpxVibeMcpServer(options);
+  const maxConcurrent = Math.max(1, Number(options.maxConcurrentRequests ?? MAX_CONCURRENT_REQUESTS));
+  const pending = new Set();
   let buffer = "";
+
+  // A scan can take minutes. Awaiting each line in turn meant one long
+  // scan_project blocked every later request, including ping. JSON-RPC responses
+  // carry their own id, so completing out of order is fine.
+  const dispatch = async (line) => {
+    while (pending.size >= maxConcurrent) {
+      await Promise.race(pending);
+    }
+    const task = handleLine(server, line, output)
+      .catch((error) => {
+        errorOutput.write?.(`npx-vibe mcp: ${error.message}\n`);
+      })
+      .finally(() => pending.delete(task));
+    pending.add(task);
+  };
 
   input.setEncoding?.("utf8");
   for await (const chunk of input) {
@@ -361,13 +399,14 @@ export async function startMcpServer(options = {}) {
     while ((newline = buffer.indexOf("\n")) !== -1) {
       const line = buffer.slice(0, newline).replace(/\r$/, "");
       buffer = buffer.slice(newline + 1);
-      await handleLine(server, line, output);
+      await dispatch(line);
     }
   }
 
   if (buffer.trim()) {
-    await handleLine(server, buffer.replace(/\r$/, ""), output);
+    await dispatch(buffer.replace(/\r$/, ""));
   }
+  await Promise.allSettled([...pending]);
   return 0;
 }
 
@@ -397,6 +436,8 @@ function createScanConfig(args, kind, env, cwd) {
   if (kind === "project") {
     argv.push("--project", args.path ?? ".");
     if (args.includeDev) argv.push("--include-dev");
+    if (args.transitive) argv.push("--transitive");
+    if (args.maxPackages !== undefined) argv.push("--max-packages", String(args.maxPackages));
     if (args.concurrency !== undefined) argv.push("--concurrency", String(args.concurrency));
     if (args.aiLimit !== undefined) argv.push("--ai-limit", String(args.aiLimit));
   } else {

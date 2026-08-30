@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { parsePackageSpec, parseVersion } from "./spec.js";
+import { fetchBulkDownloads } from "./registry.js";
+import { compareVersions, parsePackageSpec, parseVersion } from "./spec.js";
+
 
 const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies"];
 const UNSUPPORTED_DEPENDENCY_PREFIXES = [
@@ -85,9 +87,66 @@ export function collectProjectDependencies(project, options = {}) {
     }
   }
 
-  return [...dependencies.values()]
+  const direct = [...dependencies.values()]
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((dependency) => resolveProjectDependency(dependency, project.lockfile));
+
+  if (!options.transitive) {
+    return direct;
+  }
+  return [...direct, ...collectTransitiveDependencies(project, direct, options)];
+}
+
+// The lockfile already describes the whole installed tree. Real supply-chain
+// compromises usually arrive through a transitive dependency, so this walks every
+// registry-resolved entry rather than only the ones named in package.json.
+function collectTransitiveDependencies(project, direct, options = {}) {
+  const entries = project.lockfile?.packages;
+  if (!entries || typeof entries !== "object" || Array.isArray(entries)) {
+    return [];
+  }
+
+  // Keyed by name@version, so a second copy of a direct dependency pinned to a
+  // different version elsewhere in the tree is still reviewed.
+  const seen = new Set(direct.map((dependency) => dependency.packageSpec));
+  const collected = new Map();
+
+  for (const [location, entry] of Object.entries(entries)) {
+    if (!location || !entry || typeof entry !== "object" || !location.includes("node_modules/")) {
+      continue;
+    }
+    if (entry.link || entry.extraneous) {
+      continue;
+    }
+    if (entry.dev && !options.includeDev) {
+      continue;
+    }
+
+    const name = location.split("node_modules/").pop();
+    const version = entry.version;
+    if (!name || !parseVersion(version)) {
+      continue;
+    }
+    if (!String(entry.resolved ?? "").toLowerCase().startsWith("http")) {
+      continue;
+    }
+
+    const key = `${name}@${version}`;
+    if (seen.has(key) || collected.has(key)) {
+      continue;
+    }
+    collected.set(key, {
+      name,
+      requested: version,
+      groups: [entry.dev ? "transitive (dev)" : "transitive"],
+      packageSpec: key,
+      resolvedFrom: "package-lock.json",
+    });
+  }
+
+  return [...collected.values()].sort((left, right) =>
+    left.name.localeCompare(right.name) || compareVersions(left.requested, right.requested)
+  );
 }
 
 export async function scanProject(input, options, reviewer) {
@@ -96,11 +155,27 @@ export async function scanProject(input, options, reviewer) {
   }
 
   const project = loadProjectManifest(input, options);
+  if (options.transitive && !project.lockfile) {
+    throw new Error(
+      project.lockfileError
+        ? `Transitive scanning needs a readable package-lock.json: ${project.lockfileError}`
+        : "Transitive scanning needs a package-lock.json next to package.json. Run npm install first."
+    );
+  }
+
   const discovered = collectProjectDependencies(project, options);
-  const reviewable = discovered.filter((dependency) => dependency.packageSpec);
+  const maxPackages = Number(options.projectMaxPackages ?? 500);
+  const allReviewable = discovered.filter((dependency) => dependency.packageSpec);
+  const reviewable = allReviewable.slice(0, maxPackages);
   const skipped = discovered
     .filter((dependency) => !dependency.packageSpec)
-    .map(({ name, requested, groups, reason }) => ({ name, requested, groups, reason }));
+    .map(({ name, requested, groups, reason }) => ({ name, requested, groups, reason }))
+    .concat(allReviewable.slice(maxPackages).map(({ name, requested, groups }) => ({
+      name,
+      requested,
+      groups,
+      reason: `Beyond the --max-packages limit of ${maxPackages}.`,
+    })));
   const packages = new Array(reviewable.length);
   const errors = [];
   const aiEnabled = options.aiMode && options.aiMode !== "off";
@@ -108,7 +183,12 @@ export async function scanProject(input, options, reviewer) {
   let aiAttempts = 0;
   let aiSuppressed = 0;
 
-  const reviewOne = async (dependency, index, reviewOptions = options) => {
+  // Fetch weekly download counts for the whole scan in one or two requests.
+  const downloadsCache = await fetchBulkDownloads(reviewable.map((dependency) => dependency.name), options)
+    .catch(() => new Map());
+  const baseOptions = { ...options, downloadsCache };
+
+  const reviewOne = async (dependency, index, reviewOptions = baseOptions) => {
     try {
       const reviewed = await reviewer(dependency.packageSpec, {
         ...reviewOptions,
@@ -140,7 +220,7 @@ export async function scanProject(input, options, reviewer) {
     for (let index = 0; index < reviewable.length; index += 1) {
       const aiAllowed = aiAttempts < aiLimit;
       const result = await reviewOne(reviewable[index], index, {
-        ...options,
+        ...baseOptions,
         aiMode: aiAllowed ? options.aiMode : "off",
       });
       if (!result) {
@@ -153,7 +233,7 @@ export async function scanProject(input, options, reviewer) {
       }
     }
   } else {
-    await mapConcurrent(reviewable, Number(options.projectConcurrency ?? 3), reviewOne);
+    await mapConcurrent(reviewable, Number(baseOptions.projectConcurrency ?? 3), reviewOne);
   }
 
   const completed = packages.filter(Boolean);
@@ -172,6 +252,7 @@ export async function scanProject(input, options, reviewer) {
       lockfilePath: project.lockfilePath,
       lockfileError: project.lockfileError,
       includeDev: Boolean(options.includeDev),
+      transitive: Boolean(options.transitive),
     },
     verdict,
     summary: {

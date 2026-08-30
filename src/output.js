@@ -202,14 +202,16 @@ export function renderProjectDashboard(scan, options = {}) {
       : color.red("Block");
   const symbol = incomplete ? "!" : SYMBOLS[verdict];
   const version = scan.project.version ? `@${scan.project.version}` : "";
+  const scopeLabel = scan.project.transitive ? "dependencies (direct and transitive)" : "direct dependencies";
   const lines = [
     `${symbol} npx-vibe project: ${headline}  ${color.dim(`highest risk ${scan.verdict.score}/100`)}`,
     `${scan.project.name}${version}`,
     color.dim(scan.project.manifestPath),
     "",
-    `Scanned: ${scan.summary.scanned}/${scan.summary.discovered} direct dependencies  ` +
+    `Scanned: ${scan.summary.scanned}/${scan.summary.discovered} ${scopeLabel}  ` +
       `Proceed: ${scan.summary.proceed}  Caution: ${scan.summary.caution}  Block: ${scan.summary.block}`,
-    `Scope: dependencies + optionalDependencies${scan.project.includeDev ? " + devDependencies" : ""}`,
+    `Scope: dependencies + optionalDependencies${scan.project.includeDev ? " + devDependencies" : ""}` +
+      `${scan.project.transitive ? " + the transitive tree from package-lock.json" : ""}`,
     `Resolution: ${scan.project.lockfilePath
       ? "exact versions from package-lock.json when available"
       : scan.project.lockfileError
@@ -276,7 +278,7 @@ export function renderProjectDashboard(scan, options = {}) {
   if (scan.errors.length) {
     lines.push(color.red("Action: fix scan errors before relying on the aggregate verdict."));
   } else if (verdict === "proceed") {
-    lines.push(color.green("Action: no reviewable direct dependency triggered Caution or Block."));
+    lines.push(color.green(`Action: no reviewable ${scan.project.transitive ? "dependency" : "direct dependency"} triggered Caution or Block.`));
   } else if (verdict === "caution") {
     lines.push(color.yellow("Action: review the flagged dependencies and their evidence individually."));
   } else {
@@ -310,7 +312,9 @@ export function renderProjectMarkdownSummary(scan) {
   const lines = [
     `## ${title}`,
     "",
-    `Scanned **${scan.summary.scanned}** of **${scan.summary.discovered}** direct dependencies without executing package code.`,
+    `Scanned **${scan.summary.scanned}** of **${scan.summary.discovered}** `
+      + `${scan.project?.transitive ? "dependencies (direct and transitive)" : "direct dependencies"} `
+      + "without executing package code.",
     "",
     `- Proceed: **${scan.summary.proceed}**`,
     `- Caution: **${scan.summary.caution}**`,

@@ -6,6 +6,7 @@ import { userAgent } from "./version.js";
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 const DEFAULT_DOWNLOADS_API = "https://api.npmjs.org/downloads/point/last-week";
 const DEFAULT_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024;
+const BULK_DOWNLOADS_CHUNK = 128;
 
 export async function loadPackageSnapshot(spec, options = {}) {
   const registry = stripTrailingSlash(options.registry ?? DEFAULT_REGISTRY);
@@ -17,10 +18,12 @@ export async function loadPackageSnapshot(spec, options = {}) {
     throw new Error(`Registry metadata for ${spec.name}@${version} was incomplete.`);
   }
 
-  const downloads = await fetchDownloads(spec.name, options).catch((error) => ({
-    downloads: null,
-    error: error.message,
-  }));
+  const downloads = options.downloadsCache?.has(spec.name)
+    ? options.downloadsCache.get(spec.name)
+    : await fetchDownloads(spec.name, options).catch((error) => ({
+        downloads: null,
+        error: error.message,
+      }));
   const profile = await buildPackageProfile(packument, manifest, version, options);
 
   return {
@@ -43,6 +46,36 @@ export async function loadPackageSnapshot(spec, options = {}) {
 export async function fetchDownloads(packageName, options = {}) {
   const url = `${DEFAULT_DOWNLOADS_API}/${encodeURIComponent(packageName)}`;
   return fetchJson(url, options);
+}
+
+// One request per package rate-limits the npm downloads API well before a
+// transitive tree is finished, which turned into a wall of downloads_unavailable
+// findings. The bulk endpoint takes up to 128 names at a time; it does not accept
+// scoped packages, so those still fall back to a single request each.
+export async function fetchBulkDownloads(packageNames, options = {}) {
+  const results = new Map();
+  const names = [...new Set(packageNames)].filter((name) => name && !name.startsWith("@"));
+
+  for (let index = 0; index < names.length; index += BULK_DOWNLOADS_CHUNK) {
+    const chunk = names.slice(index, index + BULK_DOWNLOADS_CHUNK);
+    const url = `${DEFAULT_DOWNLOADS_API}/${chunk.map(encodeURIComponent).join(",")}`;
+    const payload = await fetchJson(url, options).catch(() => null);
+    if (!payload) {
+      continue;
+    }
+
+    if (typeof payload.downloads === "number") {
+      results.set(payload.package ?? chunk[0], payload);
+      continue;
+    }
+    for (const [name, value] of Object.entries(payload)) {
+      if (value && typeof value.downloads === "number") {
+        results.set(name, value);
+      }
+    }
+  }
+
+  return results;
 }
 
 export async function downloadTarball(url, options = {}) {

@@ -154,3 +154,48 @@ test("project scan operational errors override verdict exit codes", async () => 
   assert.equal(scan.summary.errors, 1);
   assert.equal(projectExitCode(scan), 1);
 });
+
+test("transitive scanning walks the lockfile tree and honours dev flags", () => {
+  const project = {
+    manifestPath: "/repo/package.json",
+    directory: "/repo",
+    manifest: { name: "app", dependencies: { alpha: "^1.0.0" }, devDependencies: { tooling: "^2.0.0" } },
+    lockfile: {
+      packages: {
+        "": { name: "app" },
+        "node_modules/alpha": { version: "1.4.0", resolved: "https://registry.npmjs.org/alpha/-/alpha-1.4.0.tgz" },
+        "node_modules/beta": { version: "3.1.0", resolved: "https://registry.npmjs.org/beta/-/beta-3.1.0.tgz" },
+        "node_modules/@scope/gamma": { version: "0.2.0", resolved: "https://registry.npmjs.org/@scope/gamma/-/gamma-0.2.0.tgz" },
+        "node_modules/alpha/node_modules/beta": { version: "2.0.0", resolved: "https://registry.npmjs.org/beta/-/beta-2.0.0.tgz" },
+        "node_modules/tooling": { version: "2.5.0", dev: true, resolved: "https://registry.npmjs.org/tooling/-/tooling-2.5.0.tgz" },
+        "node_modules/linked": { link: true, resolved: "packages/linked" },
+        "node_modules/from-git": { version: "1.0.0", resolved: "git+ssh://git@github.com/o/r.git#abc" },
+      },
+    },
+  };
+
+  const direct = collectProjectDependencies(project, {});
+  assert.deepEqual(direct.map((dependency) => dependency.packageSpec), ["alpha@1.4.0"]);
+
+  const transitive = collectProjectDependencies(project, { transitive: true });
+  assert.deepEqual(transitive.map((dependency) => dependency.packageSpec), [
+    "alpha@1.4.0",
+    "@scope/gamma@0.2.0",
+    "beta@2.0.0",
+    "beta@3.1.0",
+  ]);
+  // Workspace links and git resolutions stay outside the registry-only boundary.
+  assert.equal(transitive.some((dependency) => dependency.name === "linked"), false);
+  assert.equal(transitive.some((dependency) => dependency.name === "from-git"), false);
+  assert.equal(transitive.some((dependency) => dependency.name === "tooling"), false);
+
+  const withDev = collectProjectDependencies(project, { transitive: true, includeDev: true });
+  assert.ok(withDev.some((dependency) => dependency.packageSpec === "tooling@2.5.0"));
+});
+
+test("transitive scanning requires a lockfile", async () => {
+  await assert.rejects(
+    () => scanProject(".", { transitive: true }, async () => ({ result: {} })),
+    /needs a package-lock\.json/
+  );
+});
