@@ -1,18 +1,19 @@
-const LIFECYCLE_SCRIPT_NAMES = [
-  "preinstall",
-  "install",
-  "postinstall",
-  "prepublish",
-  "preprepare",
-  "prepare",
-  "postprepare",
-];
+// Two signals this far apart in one file are treated as one behaviour.
+const MAX_RELATED_DISTANCE = 800;
 
+// npm runs these when a consumer installs the published tarball.
+const INSTALL_SCRIPT_NAMES = ["preinstall", "install", "postinstall"];
+
+// npm runs these only in the package's own checkout, during `npm publish`, or
+// for a git dependency. Installing this package from the registry never runs
+// them, so they are useful context rather than install-time risk.
+const PUBLISH_SCRIPT_NAMES = ["prepublish", "preprepare", "prepare", "postprepare"];
+
+// Only the fields npm installs on a consumer's behalf. A dependency's own
+// devDependencies and peerDependencies are never fetched for the consumer.
 const DEPENDENCY_FIELDS = [
   "dependencies",
   "optionalDependencies",
-  "peerDependencies",
-  "devDependencies",
   "bundleDependencies",
   "bundledDependencies",
 ];
@@ -22,7 +23,8 @@ const SECRET_PATTERNS = [
   /npmrc|\.ssh|id_rsa|id_ed25519/i,
 ];
 
-const NETWORK_PATTERNS = [
+// Calls that actually move bytes off the machine.
+const NETWORK_SINK_PATTERNS = [
   /\bfetch\s*\(/,
   /\baxios\b/,
   /\brequest\s*\(/,
@@ -33,8 +35,16 @@ const NETWORK_PATTERNS = [
   /\bwget\b/i,
   /\bInvoke-WebRequest\b/i,
   /\biwr\b/i,
+];
+
+// A bare URL is a weak signal on its own: documentation links, license headers,
+// and URL parsers all contain them. It is meaningful inside an install command,
+// not as evidence that data left the machine.
+const NETWORK_URL_PATTERNS = [
   /https?:\/\/[^\s"'`]+/i,
 ];
+
+const NETWORK_PATTERNS = [...NETWORK_SINK_PATTERNS, ...NETWORK_URL_PATTERNS];
 
 const SHELL_PATTERNS = [
   /\bexec(File|Sync)?\s*\(/,
@@ -66,7 +76,9 @@ const ENV_ENUMERATION_PATTERNS = [
   /JSON\.stringify\s*\(\s*process\.env\s*\)/,
   /Object\.(?:keys|entries|values)\s*\(\s*process\.env\s*\)/,
   /for\s*\([^)]*\bin\s+process\.env\s*\)/,
-  /(?:printenv|set|env)\s*(?:\||>|$)/i,
+  // A shell env dump has to look like a command with a sink. Without the leading
+  // boundary this also matched `offset|0` and `charset>` in ordinary JavaScript.
+  /(?:^|[\s;&|])(?:printenv|env|set)\s*[|>]/i,
 ];
 
 export function analyzePackage(snapshot, tarballInspection, options = {}) {
@@ -115,8 +127,10 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
     });
   }
 
-  const lifecycleScripts = lifecycleScriptEntries(manifest);
-  for (const script of lifecycleScripts) {
+  const installScripts = scriptEntries(manifest, INSTALL_SCRIPT_NAMES);
+  const publishScripts = scriptEntries(manifest, PUBLISH_SCRIPT_NAMES);
+
+  for (const script of installScripts) {
     findings.push({
       severity: "medium",
       code: "lifecycle_hook",
@@ -125,6 +139,16 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
       evidence: [{ line: null, excerpt: `${script.name}: ${script.command}` }],
     });
     findings.push(...analyzeText(script.command, `package.json#scripts.${script.name}`, { isLifecycleCommand: true }));
+  }
+
+  for (const script of publishScripts) {
+    findings.push({
+      severity: "low",
+      code: "publish_lifecycle_hook",
+      file: "package.json",
+      detail: `${script.name} runs: ${script.command}. npm does not run this when installing the published package.`,
+      evidence: [{ line: null, excerpt: `${script.name}: ${script.command}` }],
+    });
   }
 
   findings.push(...dependencyProtocolFindings(manifest));
@@ -154,8 +178,11 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
       packageAgeDays,
       versionAgeDays,
       weeklyDownloads,
-      lifecycleScripts,
+      lifecycleScripts: installScripts,
+      publishScripts,
       selectedFileCount: tarballInspection.selectedFiles?.length ?? 0,
+      truncatedFileCount: (tarballInspection.selectedFiles ?? []).filter((file) => file.truncated).length,
+      omittedFileCount: tarballInspection.omittedFileCount ?? 0,
       fileCount: tarballInspection.fileCount,
       totalUnpackedBytes: tarballInspection.totalUnpackedBytes,
       trustContext: buildTrustContext(snapshot, packageAgeDays, weeklyDownloads),
@@ -224,11 +251,14 @@ export function addAiUnavailableFinding(analysis, reason) {
   };
 }
 
+const SECRET_ACCESS_PATTERNS = [...SECRET_PATTERNS, ...ENV_ENUMERATION_PATTERNS];
+
 function analyzeText(text, file, context) {
   const findings = [];
   const source = String(text ?? "");
-  const secretEvidence = evidenceForPatterns(source, [...SECRET_PATTERNS, ...ENV_ENUMERATION_PATTERNS]);
+  const secretEvidence = evidenceForPatterns(source, SECRET_ACCESS_PATTERNS);
   const networkEvidence = evidenceForPatterns(source, NETWORK_PATTERNS);
+  const networkSinkEvidence = evidenceForPatterns(source, NETWORK_SINK_PATTERNS);
   const shellEvidence = evidenceForPatterns(source, SHELL_PATTERNS);
   const obfuscationEvidence = evidenceForPatterns(source, OBFUSCATION_PATTERNS);
   const outsideWriteEvidence = evidenceForPatterns(source, OUTSIDE_WRITE_PATTERNS);
@@ -243,16 +273,31 @@ function analyzeText(text, file, context) {
   const hasDownloadCommand = downloadEvidence.length > 0;
   const pipesToShell = pipeEvidence.length > 0;
   const installRelatedFile = (context.reviewReasons ?? []).some((reason) => /(?:pre|post)?install|setup|prepare|suspicious/i.test(reason));
-  const networkAndShellAreRelated = installRelatedFile || patternGroupsAreNear(source, NETWORK_PATTERNS, SHELL_PATTERNS, 800);
+  const networkAndShellAreRelated = installRelatedFile
+    || patternGroupsAreNear(source, NETWORK_SINK_PATTERNS, SHELL_PATTERNS, MAX_RELATED_DISTANCE);
 
-  if (hasSecretAccess && hasNetwork) {
-    findings.push({
-      severity: "critical",
-      code: "possible_secret_exfiltration",
-      file,
-      detail: "Code appears to access environment/secrets and perform network activity.",
-      evidence: mergeEvidence(secretEvidence, networkEvidence),
-    });
+  // A secret read and a network call in the same file only imply exfiltration when
+  // they are actually connected. Bundled dependencies routinely contain both,
+  // hundreds of lines apart, for entirely unrelated reasons.
+  if (hasSecretAccess && networkSinkEvidence.length) {
+    const related = context.isLifecycleCommand
+      || installRelatedFile
+      || patternGroupsAreNear(source, SECRET_ACCESS_PATTERNS, NETWORK_SINK_PATTERNS, MAX_RELATED_DISTANCE);
+    findings.push(related
+      ? {
+          severity: "critical",
+          code: "possible_secret_exfiltration",
+          file,
+          detail: "Code reads environment/secrets and sends data over the network from the same code path.",
+          evidence: mergeEvidence(secretEvidence, networkSinkEvidence),
+        }
+      : {
+          severity: "low",
+          code: "env_access_and_network",
+          file,
+          detail: "Code reads environment/secrets and also makes network calls, but the two are far apart and may be unrelated.",
+          evidence: mergeEvidence(secretEvidence, networkSinkEvidence),
+        });
   }
 
   if (pipesToShell || (hasDownloadCommand && hasShell)) {
@@ -287,7 +332,7 @@ function analyzeText(text, file, context) {
 
   if (hasObfuscation) {
     findings.push({
-      severity: hasNetwork || hasSecretAccess ? "high" : "medium",
+      severity: networkSinkEvidence.length > 0 || hasSecretAccess ? "high" : "medium",
       code: "obfuscated_code",
       file,
       detail: "Code contains eval/dynamic execution, base64-like payloads, or other obfuscation signals.",
@@ -305,13 +350,13 @@ function analyzeText(text, file, context) {
     });
   }
 
-  if (!context.isLifecycleCommand && hasShell && hasNetwork && networkAndShellAreRelated) {
+  if (!context.isLifecycleCommand && hasShell && networkSinkEvidence.length && networkAndShellAreRelated) {
     findings.push({
       severity: "medium",
       code: "network_and_shell",
       file,
       detail: "Code combines network access with shell execution.",
-      evidence: mergeEvidence(networkEvidence, shellEvidence),
+      evidence: mergeEvidence(networkSinkEvidence, shellEvidence),
     });
   }
 
@@ -351,9 +396,9 @@ function dependencyProtocolFindings(manifest) {
   return findings;
 }
 
-function lifecycleScriptEntries(manifest) {
+function scriptEntries(manifest, names) {
   const scripts = manifest?.scripts ?? {};
-  return LIFECYCLE_SCRIPT_NAMES.flatMap((name) => {
+  return names.flatMap((name) => {
     const command = scripts[name];
     return typeof command === "string" && command.trim() ? [{ name, command }] : [];
   });
