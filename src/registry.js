@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { resolveVersion } from "./spec.js";
 import { buildPackageProfile } from "./profile.js";
+import { userAgent } from "./version.js";
 
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 const DEFAULT_DOWNLOADS_API = "https://api.npmjs.org/downloads/point/last-week";
-const USER_AGENT = "npx-vibe/1.5.1 (+https://www.npmjs.com/package/npx-vibe)";
+const DEFAULT_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024;
 
 export async function loadPackageSnapshot(spec, options = {}) {
   const registry = stripTrailingSlash(options.registry ?? DEFAULT_REGISTRY);
@@ -49,13 +50,19 @@ export async function downloadTarball(url, options = {}) {
     throw new Error("Package metadata did not include a tarball URL.");
   }
 
-  const response = await fetchWithTimeout(url, options);
-  if (!response.ok) {
-    throw new Error(`Could not download package tarball (${response.status} ${response.statusText}).`);
-  }
+  const maxBytes = Number(options.maxDownloadBytes ?? DEFAULT_MAX_DOWNLOAD_BYTES);
+  return requestWithTimeout(url, options, async (response) => {
+    if (!response.ok) {
+      throw new Error(`Could not download package tarball (${response.status} ${response.statusText}).`);
+    }
 
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+    const declared = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new Error(oversizeMessage(declared, maxBytes));
+    }
+
+    return readBodyWithLimit(response, maxBytes);
+  });
 }
 
 export function verifyTarball(buffer, snapshot) {
@@ -94,30 +101,35 @@ export function verifyTarball(buffer, snapshot) {
 }
 
 export async function fetchJson(url, options = {}) {
-  const response = await fetchWithTimeout(url, options);
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error(`Not found: ${url}`);
+  return requestWithTimeout(url, options, async (response) => {
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`Not found: ${url}`);
+      }
+      throw new Error(`Request failed for ${url} (${response.status} ${response.statusText}).`);
     }
-    throw new Error(`Request failed for ${url} (${response.status} ${response.statusText}).`);
-  }
-  return response.json();
+    return response.json();
+  });
 }
 
-async function fetchWithTimeout(url, options = {}) {
+// The abort signal has to stay armed while the body is read. Clearing the timer
+// as soon as the headers arrive left every body read untimed and unbounded, so a
+// slow-drip or endless response body hung the scan indefinitely.
+async function requestWithTimeout(url, options = {}, consume) {
   const timeoutMs = Number(options.timeoutMs ?? 15_000);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(url, {
+    const response = await fetch(url, {
       headers: {
         "accept": "application/json",
-        "user-agent": USER_AGENT,
+        "user-agent": userAgent(),
         ...(options.headers ?? {}),
       },
       signal: controller.signal,
     });
+    return await consume(response);
   } catch (error) {
     if (error.name === "AbortError") {
       throw new Error(`Timed out after ${timeoutMs}ms while fetching ${url}.`);
@@ -126,6 +138,32 @@ async function fetchWithTimeout(url, options = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function readBodyWithLimit(response, maxBytes) {
+  if (!response.body) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > maxBytes) {
+      throw new Error(oversizeMessage(buffer.length, maxBytes));
+    }
+    return buffer;
+  }
+
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of response.body) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      throw new Error(oversizeMessage(total, maxBytes));
+    }
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks, total);
+}
+
+function oversizeMessage(bytes, maxBytes) {
+  return `Package tarball exceeds the ${Math.round(maxBytes / 1024 / 1024)} MiB download limit `
+    + `(at least ${(bytes / 1024 / 1024).toFixed(1)} MiB).`;
 }
 
 function parseIntegrity(integrity) {

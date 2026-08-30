@@ -81,14 +81,35 @@ export function resolveVersion(packument, wanted = "latest") {
 
   const matching = versions
     .filter((version) => matchSemverRange(version, wanted))
-    .sort(compareVersions)
-    .pop();
+    .sort(compareVersions);
+  // npm resolves a range to a prerelease only when the range itself names one.
+  // Without this, `^1.0.0` picked 1.3.0-beta.1 over the published 1.2.0.
+  const stable = matching.filter((version) => !parseVersion(version)?.prerelease);
+  const resolved = stable.length > 0 && !rangeAllowsPrerelease(wanted)
+    ? stable.at(-1)
+    : matching.at(-1);
 
-  if (matching) {
-    return matching;
+  if (resolved) {
+    return resolved;
   }
 
   throw new Error(`Could not resolve ${packument.name}@${wanted}.`);
+}
+
+function rangeAllowsPrerelease(range) {
+  return String(range ?? "")
+    .split(" ")
+    .join(",")
+    .split("|")
+    .join(",")
+    .split(",")
+    .some((part) => {
+      let value = part.trim();
+      while (value && "~^<>=v".includes(value[0])) {
+        value = value.slice(1);
+      }
+      return Boolean(parseVersion(value)?.prerelease);
+    });
 }
 
 export function matchSemverRange(version, range) {

@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -18,7 +18,12 @@ export function createReviewFingerprint(snapshot, integrity, analysis, inspectio
     packageName: snapshot.spec.name,
     version: snapshot.version,
     integrityKey,
-    lifecycleScripts: (analysis.stats.lifecycleScripts ?? []).map((script) => ({
+    // Publish-time hooks are low risk for a consumer but a change to one is still
+    // worth reporting, so the fingerprint tracks both sets.
+    lifecycleScripts: [
+      ...(analysis.stats.lifecycleScripts ?? []),
+      ...(analysis.stats.publishScripts ?? []),
+    ].map((script) => ({
       name: script.name,
       command: script.command,
     })),
@@ -140,14 +145,28 @@ export function saveReviewMemory(memory, fingerprint, result) {
     }
 
     mkdirSync(dirname(memory.path), { recursive: true });
-    writeFileSync(memory.path, JSON.stringify({
+    writeAtomic(memory.path, JSON.stringify({
       schemaVersion: HISTORY_SCHEMA_VERSION,
       packages,
-    }, null, 2), { encoding: "utf8", mode: 0o600 });
+    }, null, 2));
     memory.data = { schemaVersion: HISTORY_SCHEMA_VERSION, packages };
     return { saved: true, path: memory.path };
   } catch (error) {
     return { saved: false, reason: `Could not save local review memory: ${error.message}` };
+  }
+}
+
+// A project scan reviews several packages at once and each one writes this file.
+// A plain writeFileSync leaves a window where a parallel scan reads a half-written
+// file, which surfaced as "Could not read local review memory".
+function writeAtomic(path, contents) {
+  const temporary = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  try {
+    writeFileSync(temporary, contents, { encoding: "utf8", mode: 0o600 });
+    renameSync(temporary, path);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
   }
 }
 

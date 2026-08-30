@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -93,4 +93,18 @@ test("parallel reviewers merge stale history snapshots instead of dropping packa
   const packages = JSON.parse(readFileSync(historyFile, "utf8")).packages;
   assert.ok(packages.demo);
   assert.ok(packages["another-demo"]);
+});
+
+test("review memory is written atomically and leaves no temporary files", () => {
+  const directory = mkdtempSync(join(tmpdir(), "npx-vibe-history-"));
+  const historyFile = join(directory, "reviews.json");
+  const result = { verdict: { verdict: "proceed", score: 0 }, ai: { status: "skipped" } };
+
+  for (let index = 0; index < 5; index += 1) {
+    const memory = loadReviewMemory({ historyFile });
+    assert.equal(saveReviewMemory(memory, { ...fingerprint(), version: `1.0.${index}` }, result).saved, true);
+    assert.equal(JSON.parse(readFileSync(historyFile, "utf8")).schemaVersion, 1);
+  }
+
+  assert.deepEqual(readdirSync(directory), ["reviews.json"]);
 });

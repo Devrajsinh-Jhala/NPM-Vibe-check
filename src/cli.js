@@ -1,8 +1,7 @@
 import { spawn } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
+import { packageVersion } from "./version.js";
 import { parsePackageSpec } from "./spec.js";
 import { loadPackageSnapshot, downloadTarball, verifyTarball } from "./registry.js";
 import { inspectTarball } from "./tarball.js";
@@ -218,7 +217,7 @@ export function parseArgs(argv, env = process.env) {
     model: env.NPX_VIBE_MODEL,
     modelProfile: env.NPX_VIBE_MODEL_PROFILE ?? "balanced",
     appUrl: env.NPX_VIBE_APP_URL,
-    aiMaxTokens: numberFromEnv(env.NPX_VIBE_AI_MAX_TOKENS, 1_500),
+    aiMaxTokens: numberFromEnv(env.NPX_VIBE_AI_MAX_TOKENS, 4_000),
     apiKeys: {
       NPX_VIBE_API_KEY: env.NPX_VIBE_API_KEY,
       OPENAI_API_KEY: env.OPENAI_API_KEY,
@@ -232,6 +231,7 @@ export function parseArgs(argv, env = process.env) {
     ollamaUrl: env.NPX_VIBE_OLLAMA_URL,
     ollamaModel: env.NPX_VIBE_OLLAMA_MODEL,
     registry: env.NPX_VIBE_REGISTRY,
+    githubToken: env.NPX_VIBE_GITHUB_TOKEN ?? env.GITHUB_TOKEN ?? env.GH_TOKEN,
     ageDays: numberFromEnv(env.NPX_VIBE_AGE_DAYS, 14),
     downloadsThreshold: numberFromEnv(env.NPX_VIBE_DOWNLOADS, 1_000),
     cautionScore: numberFromEnv(env.NPX_VIBE_CAUTION_SCORE, 40),
@@ -659,11 +659,7 @@ function boundedIntegerFlag(name, value, minimum, maximum) {
   return number;
 }
 
-export function packageVersion() {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const packageJson = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
-  return packageJson.version;
-}
+export { packageVersion };
 
 function helpText() {
   return `npx-vibe - cautious npm exec wrapper

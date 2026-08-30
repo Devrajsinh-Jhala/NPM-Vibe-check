@@ -1,4 +1,4 @@
-const USER_AGENT = "npx-vibe/1.5.1 (+https://www.npmjs.com/package/npx-vibe)";
+import { userAgent } from "./version.js";
 
 export async function buildPackageProfile(packument, manifest, version, options = {}) {
   const repository = normalizeRepository(manifest.repository ?? packument.repository);
@@ -55,8 +55,9 @@ export function normalizeRepository(repository) {
 }
 
 async function fetchGitHubProfile(slug, options = {}) {
-  const repo = await fetchGitHubJson(`https://api.github.com/repos/${slug}`, options);
-  const commits = await fetchGitHubJson(`https://api.github.com/repos/${slug}/commits?per_page=1`, options).catch(() => []);
+  const path = slug.split("/").map((segment) => encodeURIComponent(segment)).join("/");
+  const repo = await fetchGitHubJson(`https://api.github.com/repos/${path}`, options);
+  const commits = await fetchGitHubJson(`https://api.github.com/repos/${path}/commits?per_page=1`, options).catch(() => []);
   const latestCommit = Array.isArray(commits) && commits[0] ? commits[0] : null;
 
   return {
@@ -92,7 +93,10 @@ async function fetchGitHubJson(url, options = {}) {
     const response = await fetch(url, {
       headers: {
         accept: "application/vnd.github+json",
-        "user-agent": USER_AGENT,
+        "user-agent": userAgent(),
+        // Unauthenticated GitHub is 60 requests per hour per IP, which shared CI
+        // runners exhaust quickly. Only ever sent to api.github.com.
+        ...(options.githubToken ? { authorization: `Bearer ${options.githubToken}` } : {}),
       },
       signal: controller.signal,
     });

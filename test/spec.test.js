@@ -41,3 +41,19 @@ test("matchSemverRange handles comparator sets", () => {
   assert.equal(matchSemverRange("2.0.0", ">=1.0.0 <2.0.0"), false);
   assert.equal(matchSemverRange("3.1.0", "^1.0.0 || ^3.0.0"), true);
 });
+
+test("resolveVersion prefers stable versions over prereleases", () => {
+  const packument = {
+    name: "ranged",
+    "dist-tags": { latest: "1.2.0", next: "1.3.0-beta.1" },
+    versions: { "1.1.0": {}, "1.2.0": {}, "1.3.0-beta.1": {} },
+  };
+
+  assert.equal(resolveVersion(packument, "^1.0.0"), "1.2.0");
+  assert.equal(resolveVersion(packument, ">=1.0.0"), "1.2.0");
+  assert.equal(resolveVersion(packument, "1.x"), "1.2.0");
+  // An explicit prerelease, a prerelease range, or a dist-tag still resolves to one.
+  assert.equal(resolveVersion(packument, "1.3.0-beta.1"), "1.3.0-beta.1");
+  assert.equal(resolveVersion(packument, "^1.3.0-beta.1"), "1.3.0-beta.1");
+  assert.equal(resolveVersion(packument, "next"), "1.3.0-beta.1");
+});

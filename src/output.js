@@ -24,9 +24,22 @@ export function renderDashboard(result, options = {}) {
   lines.push(...profileLines(result));
   lines.push(`Downloads: ${formatDownloads(result.stats.weeklyDownloads)}/week  Package age: ${formatDays(result.stats.packageAgeDays)}  Version age: ${formatDays(result.stats.versionAgeDays)}`);
   lines.push(`Install hooks: ${result.stats.lifecycleScripts.length ? result.stats.lifecycleScripts.map((script) => script.name).join(", ") : "none"}`);
+  if (result.stats.publishScripts?.length) {
+    lines.push(color.dim(
+      `Publish hooks (npm does not run these on install): ${result.stats.publishScripts.map((script) => script.name).join(", ")}`
+    ));
+  }
+  const coverage = [];
+  if (result.stats.truncatedFileCount) {
+    coverage.push(`${result.stats.truncatedFileCount} read only in part`);
+  }
+  if (result.stats.omittedFileCount) {
+    coverage.push(`${result.stats.omittedFileCount} past the review budget`);
+  }
   lines.push(
     `Inspected: ${result.stats.selectedFileCount} selected ${pluralize("file", result.stats.selectedFileCount)} ` +
-      `from ${result.stats.fileCount} package ${pluralize("file", result.stats.fileCount)}`
+      `from ${result.stats.fileCount} package ${pluralize("file", result.stats.fileCount)}` +
+      (coverage.length ? ` (${coverage.join(", ")})` : "")
   );
   lines.push(...trustContextLines(result.stats.trustContext, color));
   lines.push(...reviewHistoryLines(result.history, color));

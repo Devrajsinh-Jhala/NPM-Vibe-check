@@ -49,6 +49,9 @@ export function inspectTarball(tgzBuffer, options = {}) {
     maxSelectedFiles: Number(options.maxSelectedFiles ?? 40),
     maxSelectedBytes: Number(options.maxSelectedBytes ?? 384 * 1024),
     maxFileTextBytes: Number(options.maxFileTextBytes ?? 64 * 1024),
+    // Hard ceiling for decompression, well above the review limit below. Without
+    // it a small tarball could expand without bound before any size check ran.
+    maxDecompressedBytes: Number(options.maxDecompressedBytes ?? 512 * 1024 * 1024),
   };
 
   if (tgzBuffer.length > limits.maxTarballBytes) {
@@ -62,8 +65,14 @@ export function inspectTarball(tgzBuffer, options = {}) {
 
   let tarBuffer;
   try {
-    tarBuffer = gunzipSync(tgzBuffer);
+    tarBuffer = gunzipSync(tgzBuffer, { maxOutputLength: limits.maxDecompressedBytes });
   } catch (error) {
+    if (error.code === "ERR_BUFFER_TOO_LARGE") {
+      throw new Error(
+        `Package tarball expands beyond the ${Math.round(limits.maxDecompressedBytes / 1024 / 1024)} MiB `
+          + "decompression limit and was not inspected."
+      );
+    }
     throw new Error(`Could not decompress package tarball: ${error.message}`);
   }
 
@@ -82,14 +91,15 @@ export function inspectTarball(tgzBuffer, options = {}) {
   const fileMap = createFileMap(entries);
   const packageJsonEntry = findPackageJson(entries);
   const packageJson = parsePackageJson(packageJsonEntry);
-  const selectedFiles = selectFilesForReview(entries, fileMap, packageJson, limits);
+  const selection = selectFilesForReview(entries, fileMap, packageJson, limits);
 
   return {
     entries,
     fileCount: entries.filter((entry) => entry.type === "file").length,
     totalUnpackedBytes: tarBuffer.length,
     packageJson,
-    selectedFiles,
+    selectedFiles: selection.files,
+    omittedFileCount: selection.omittedFileCount,
     findings,
   };
 }
@@ -296,17 +306,29 @@ function selectFilesForReview(entries, fileMap, packageJson, limits) {
     }
   }
 
-  return Array.from(selected.entries()).slice(0, limits.maxSelectedFiles).map(([packagePath, item]) => {
+  // Both caps are applied here. The byte budget used to be computed and then
+  // discarded, so only maxSelectedFiles ever limited the returned set.
+  const files = [];
+  let omittedFileCount = 0;
+  let reviewedBytes = 0;
+  for (const [packagePath, item] of selected) {
     const text = item.entry.data.toString("utf8", 0, Math.min(item.entry.data.length, limits.maxFileTextBytes));
-    return {
+    if (files.length >= limits.maxSelectedFiles || reviewedBytes + text.length > limits.maxSelectedBytes) {
+      omittedFileCount += 1;
+      continue;
+    }
+    reviewedBytes += text.length;
+    files.push({
       path: packagePath,
       tarPath: item.entry.path,
       size: item.entry.size,
       truncated: item.entry.data.length > limits.maxFileTextBytes,
       reasons: Array.from(item.reasons),
       text,
-    };
-  });
+    });
+  }
+
+  return { files, omittedFileCount };
 }
 
 function scriptTargets(script) {

@@ -194,7 +194,7 @@ export async function callResolvedProvider(provider, messages, config = {}) {
       },
       body: JSON.stringify({
         model: provider.model,
-        max_tokens: Number(config.aiMaxTokens ?? 1_500),
+        max_tokens: Number(config.aiMaxTokens ?? 4_000),
         temperature: 0,
         system: messages.find((message) => message.role === "system")?.content ?? "",
         messages: messages
