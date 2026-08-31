@@ -194,8 +194,17 @@ test("transitive scanning walks the lockfile tree and honours dev flags", () => 
 });
 
 test("transitive scanning requires a lockfile", async () => {
+  // A temp directory, not ".": CI runs npm install before the suite, so the repo
+  // root has a package-lock.json and the rejection would never fire there.
+  const directory = mkdtempSync(join(tmpdir(), "npx-vibe-no-lock-"));
+  writeFileSync(join(directory, "package.json"), JSON.stringify({
+    name: "no-lockfile",
+    version: "1.0.0",
+    dependencies: { alpha: "^1.0.0" },
+  }));
+
   await assert.rejects(
-    () => scanProject(".", { transitive: true }, async () => ({ result: {} })),
+    () => scanProject(directory, { transitive: true }, async () => ({ result: {} })),
     /needs a package-lock\.json/
   );
 });
