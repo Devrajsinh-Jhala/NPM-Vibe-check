@@ -13,7 +13,7 @@ test("MCP registry metadata matches the npm release", async () => {
   const serverJson = JSON.parse(await readFile(new URL("../server.json", import.meta.url), "utf8"));
   const npmPackage = serverJson.packages.find((entry) => entry.registryType === "npm");
 
-  assert.equal(packageJson.version, "1.5.1");
+  assert.match(packageJson.version, /^[0-9]+[.][0-9]+[.][0-9]+$/);
   assert.equal(packageJson.mcpName, "io.github.Devrajsinh-Jhala/npx-vibe");
   assert.equal(packageJson.mcpName, serverJson.name);
   assert.equal(serverJson.version, packageJson.version);

@@ -2,7 +2,7 @@
 
 All notable changes to `npx-vibe` are documented here.
 
-## Unreleased
+## 1.6.0 - 2026-08-31
 
 ### Fixed
 
