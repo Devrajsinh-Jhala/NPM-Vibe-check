@@ -290,6 +290,7 @@ export function parseArgs(argv, env = process.env) {
     timeoutMs: numberFromEnv(env.NPX_VIBE_TIMEOUT_MS, 15_000),
     aiTimeoutMs: numberFromEnv(env.NPX_VIBE_AI_TIMEOUT_MS, 30_000),
     maxAiChars: numberFromEnv(env.NPX_VIBE_MAX_AI_CHARS, 120_000),
+    advisories: env.NPX_VIBE_ADVISORIES !== "off",
     historyEnabled: env.NPX_VIBE_HISTORY !== "off",
     historyFile: env.NPX_VIBE_HISTORY_FILE,
     npmBin: env.NPX_VIBE_NPM_BIN,
@@ -411,6 +412,9 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--allow-install-scripts":
           config.allowInstallScripts = true;
+          break;
+        case "--no-advisories":
+          config.advisories = false;
           break;
         case "--no-history":
           config.historyEnabled = false;
@@ -824,6 +828,7 @@ Options:
   --caution-score <0-100>    Default 40
   --block-score <0-100>      Default 70
   --allow-install-scripts    Let npm run reviewed root install scripts where npm supports allow-scripts
+  --no-advisories            Skip the OSV known-vulnerability lookup
   --no-history               Do not read or update local review memory
   --history-file <path>      Override the local review-memory file
   --no-color

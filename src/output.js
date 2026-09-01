@@ -23,6 +23,7 @@ export function renderDashboard(result, options = {}) {
   lines.push("");
   lines.push(...profileLines(result));
   lines.push(`Downloads: ${formatDownloads(result.stats.weeklyDownloads)}/week  Package age: ${formatDays(result.stats.packageAgeDays)}  Version age: ${formatDays(result.stats.versionAgeDays)}`);
+  lines.push(`Known advisories: ${result.stats.advisoryCount ? `${result.stats.advisoryCount} (OSV)` : "none found (OSV)"}`);
   lines.push(`Install hooks: ${result.stats.lifecycleScripts.length ? result.stats.lifecycleScripts.map((script) => script.name).join(", ") : "none"}`);
   if (result.stats.publishScripts?.length) {
     lines.push(color.dim(

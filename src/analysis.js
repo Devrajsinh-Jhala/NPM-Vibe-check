@@ -1,3 +1,5 @@
+import { advisoryFinding } from "./advisories.js";
+
 // Two signals this far apart in one file are treated as one behaviour.
 const MAX_RELATED_DISTANCE = 800;
 
@@ -153,6 +155,11 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
 
   findings.push(...dependencyProtocolFindings(manifest));
 
+  const advisory = advisoryFinding(snapshot.advisories, `${snapshot.spec.name}@${snapshot.version}`);
+  if (advisory) {
+    findings.push(advisory);
+  }
+
   for (const file of tarballInspection.selectedFiles ?? []) {
     findings.push(...analyzeText(file.text, file.path, {
       isLifecycleCommand: false,
@@ -180,6 +187,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
       weeklyDownloads,
       lifecycleScripts: installScripts,
       publishScripts,
+      advisoryCount: Array.isArray(snapshot.advisories) ? snapshot.advisories.length : 0,
       selectedFileCount: tarballInspection.selectedFiles?.length ?? 0,
       truncatedFileCount: (tarballInspection.selectedFiles ?? []).filter((file) => file.truncated).length,
       omittedFileCount: tarballInspection.omittedFileCount ?? 0,
@@ -223,7 +231,10 @@ export function scoreFindings(findings) {
 
 export function shouldAskAi(findings) {
   const codes = new Set(findings.map((finding) => finding.code));
-  if (findings.some((finding) => finding.severity === "high" || finding.severity === "critical")) {
+  // A published advisory is looked up, not reasoned about. Sending the package to
+  // a model because of one spends a call on a question the model cannot answer.
+  const behavioural = findings.filter((finding) => finding.code !== "known_vulnerability");
+  if (behavioural.some((finding) => finding.severity === "high" || finding.severity === "critical")) {
     return true;
   }
   if (codes.has("lifecycle_hook")) {

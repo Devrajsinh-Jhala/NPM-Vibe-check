@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { fetchAdvisories } from "./advisories.js";
 import { fetchBulkDownloads } from "./registry.js";
 import { compareVersions, parsePackageSpec, parseVersion } from "./spec.js";
 
@@ -186,7 +187,13 @@ export async function scanProject(input, options, reviewer) {
   // Fetch weekly download counts for the whole scan in one or two requests.
   const downloadsCache = await fetchBulkDownloads(reviewable.map((dependency) => dependency.name), options)
     .catch(() => new Map());
-  const baseOptions = { ...options, downloadsCache };
+  const advisoriesCache = options.advisories === false
+    ? new Map()
+    : await fetchAdvisories(
+        reviewable.map((dependency) => ({ name: dependency.name, version: dependency.requested })),
+        options
+      ).catch(() => new Map());
+  const baseOptions = { ...options, downloadsCache, advisoriesCache };
 
   const reviewOne = async (dependency, index, reviewOptions = baseOptions) => {
     try {

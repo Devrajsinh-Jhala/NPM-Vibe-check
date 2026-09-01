@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { resolveVersion } from "./spec.js";
 import { buildPackageProfile } from "./profile.js";
+import { fetchAdvisories } from "./advisories.js";
 import { userAgent } from "./version.js";
 
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
@@ -25,6 +26,12 @@ export async function loadPackageSnapshot(spec, options = {}) {
         error: error.message,
       }));
   const profile = await buildPackageProfile(packument, manifest, version, options);
+  const advisoryKey = `${spec.name}@${version}`;
+  const advisories = options.advisoriesCache?.has(advisoryKey)
+    ? options.advisoriesCache.get(advisoryKey)
+    : options.advisories === false
+      ? []
+      : (await fetchAdvisories([{ name: spec.name, version }], options).catch(() => new Map())).get(advisoryKey) ?? [];
 
   return {
     spec,
@@ -40,6 +47,7 @@ export async function loadPackageSnapshot(spec, options = {}) {
     packageModifiedAt: packument.time?.modified ?? null,
     versionPublishedAt: packument.time?.[version] ?? null,
     profile,
+    advisories,
   };
 }
 
