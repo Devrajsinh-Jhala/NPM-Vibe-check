@@ -1,89 +1,56 @@
-const MODEL_CATALOG_VERIFIED_AT = "2026-06-25";
-
+// npx-vibe deliberately ships no model catalog. Pinned model ids rot: when a
+// provider retires one, the call 404s, the review becomes "ai_unavailable", the
+// score is floored, and the package reports a false Caution. A scanner whose
+// accuracy decays on a timer is worse than one that asks you to name the model.
 const PROVIDERS = {
   "openai-compatible": {
     family: "chat",
     label: "OpenAI-compatible",
     keyNames: ["NPX_VIBE_API_KEY"],
     defaultUrl: "https://api.openai.com/v1/chat/completions",
-    models: {
-      fast: "gpt-5.4-nano",
-      balanced: "gpt-5.4-mini",
-      strong: "gpt-5.5",
-    },
-    recommendation: "Balanced defaults to an efficient OpenAI model. Custom endpoints should pass --model.",
+    modelsUrl: "the documentation for your endpoint",
   },
   openai: {
     family: "chat",
     label: "OpenAI",
     keyNames: ["OPENAI_API_KEY", "NPX_VIBE_API_KEY"],
     defaultUrl: "https://api.openai.com/v1/chat/completions",
-    models: {
-      fast: "gpt-5.4-nano",
-      balanced: "gpt-5.4-mini",
-      strong: "gpt-5.5",
-    },
-    recommendation: "GPT-5.4 mini balances security-review quality, latency, and cost.",
+    modelsUrl: "https://platform.openai.com/docs/models",
   },
   openrouter: {
     family: "chat",
     label: "OpenRouter",
     keyNames: ["OPENROUTER_API_KEY", "NPX_VIBE_API_KEY"],
     defaultUrl: "https://openrouter.ai/api/v1/chat/completions",
-    models: {
-      fast: "openrouter/auto",
-      balanced: "openrouter/auto",
-      strong: "openrouter/auto",
-    },
-    recommendation: "OpenRouter Auto chooses a suitable current model for each review.",
+    modelsUrl: "https://openrouter.ai/models",
   },
   groq: {
     family: "chat",
     label: "Groq",
     keyNames: ["GROQ_API_KEY", "NPX_VIBE_API_KEY"],
     defaultUrl: "https://api.groq.com/openai/v1/chat/completions",
-    models: {
-      fast: "openai/gpt-oss-20b",
-      balanced: "openai/gpt-oss-120b",
-      strong: "openai/gpt-oss-120b",
-    },
-    recommendation: "GPT-OSS 120B is a current Groq production model with strong reasoning.",
+    modelsUrl: "https://console.groq.com/docs/models",
   },
   together: {
     family: "chat",
     label: "Together AI",
     keyNames: ["TOGETHER_API_KEY", "NPX_VIBE_API_KEY"],
     defaultUrl: "https://api.together.xyz/v1/chat/completions",
-    models: {
-      fast: "Qwen/Qwen3.5-9B",
-      balanced: "Qwen/Qwen3.5-9B",
-      strong: "deepseek-ai/DeepSeek-V4-Pro",
-    },
-    recommendation: "Together currently recommends Qwen3.5 9B to get started; it supports structured output.",
+    modelsUrl: "https://docs.together.ai/docs/serverless-models",
   },
   anthropic: {
     family: "anthropic",
     label: "Anthropic",
     keyNames: ["ANTHROPIC_API_KEY", "NPX_VIBE_API_KEY"],
     defaultUrl: "https://api.anthropic.com/v1/messages",
-    models: {
-      fast: "claude-haiku-4-5",
-      balanced: "claude-sonnet-4-6",
-      strong: "claude-opus-4-8",
-    },
-    recommendation: "Sonnet 4.6 is Anthropic's current speed-and-intelligence balance.",
+    modelsUrl: "https://docs.anthropic.com/en/docs/about-claude/models",
   },
   gemini: {
     family: "gemini",
     label: "Gemini",
     keyNames: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "NPX_VIBE_API_KEY"],
     defaultUrl: "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-    models: {
-      fast: "gemini-3.1-flash-lite",
-      balanced: "gemini-3.5-flash",
-      strong: "gemini-3.5-flash",
-    },
-    recommendation: "Gemini 3.5 Flash is Google's current stable Flash model.",
+    modelsUrl: "https://ai.google.dev/gemini-api/docs/models",
   },
 };
 
@@ -91,41 +58,37 @@ export function providerNames() {
   return Object.keys(PROVIDERS);
 }
 
-export function modelProfiles() {
-  return ["fast", "balanced", "strong"];
-}
-
-export function providerModelCatalog() {
+export function providerCatalog() {
   return Object.entries(PROVIDERS)
     .filter(([name]) => name !== "openai-compatible")
     .map(([name, definition]) => ({
       name,
       label: definition.label,
-      models: { ...definition.models },
-      recommendation: definition.recommendation,
-      verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      keyNames: [...definition.keyNames],
+      endpoint: definition.defaultUrl,
+      modelsUrl: definition.modelsUrl,
     }));
 }
 
-export function formatProviderModelCatalog() {
+export function formatProviderCatalog() {
   const lines = [
-    `npx-vibe model recommendations (verified ${MODEL_CATALOG_VERIFIED_AT})`,
+    "npx-vibe AI providers",
     "",
-    "Profile: balanced (default). Override with --model-profile fast|balanced|strong",
-    "Any provider model can be selected directly with --model <id>.",
+    "No model catalog is bundled. Pass --model <id> (or set NPX_VIBE_MODEL) with",
+    "a model your provider currently serves; a retired id would otherwise turn",
+    "into a false Caution rather than a clear error.",
     "",
   ];
 
-  for (const provider of providerModelCatalog()) {
+  for (const provider of providerCatalog()) {
     lines.push(provider.label);
-    lines.push(`  fast:     ${provider.models.fast}`);
-    lines.push(`  balanced: ${provider.models.balanced}`);
-    lines.push(`  strong:   ${provider.models.strong}`);
-    lines.push(`  ${provider.recommendation}`);
+    lines.push(`  --provider ${provider.name}`);
+    lines.push(`  key:    ${provider.keyNames.join(" or ")}`);
+    lines.push(`  models: ${provider.modelsUrl}`);
     lines.push("");
   }
 
-  lines.push("Provider catalogs change. Run this command after upgrading npx-vibe, or pass --model explicitly.");
+  lines.push("Local models need no key: --ai ollama --ollama-model <name>.");
   return lines.join("\n");
 }
 
@@ -142,12 +105,15 @@ export function resolveOnlineProvider(config = {}) {
   const name = PROVIDERS[detectedName] ? detectedName : "openai-compatible";
   const definition = PROVIDERS[name];
   const apiKey = config.apiKey ?? firstConfiguredKey(definition, config)?.value ?? null;
-  const modelProfile = normalizeModelProfile(config.modelProfile);
-  const explicitModel = config.model && config.model !== "auto" ? config.model : null;
-  if (name === "openai-compatible" && config.apiUrl && !explicitModel) {
-    throw new Error("Custom OpenAI-compatible endpoints require --model <id>.");
+  const model = config.model && config.model !== "auto" ? config.model : null;
+
+  if (!model) {
+    throw new Error(
+      `Online AI review needs an explicit model. Pass --model <id> or set NPX_VIBE_MODEL. ` +
+        `Current ${definition.label} models: ${definition.modelsUrl}`
+    );
   }
-  const model = explicitModel ?? definition.models[modelProfile];
+
   const rawUrl = config.apiUrl ?? definition.defaultUrl;
 
   return {
@@ -156,10 +122,8 @@ export function resolveOnlineProvider(config = {}) {
     family: definition.family,
     apiKey,
     model,
-    modelProfile,
-    modelSource: explicitModel ? "explicit" : `profile:${modelProfile}`,
-    recommendation: definition.recommendation,
-    catalogVerifiedAt: MODEL_CATALOG_VERIFIED_AT,
+    modelSource: "explicit",
+    modelsUrl: definition.modelsUrl,
     url: rawUrl.replace("{model}", encodeURIComponent(model)),
     keyHint: definition.keyNames.join(" or "),
   };
@@ -298,11 +262,6 @@ function inferProviderFromKey(apiKey) {
     return "openai";
   }
   return null;
-}
-
-function normalizeModelProfile(value) {
-  const profile = String(value ?? "balanced").trim().toLowerCase();
-  return modelProfiles().includes(profile) ? profile : "balanced";
 }
 
 function firstConfiguredKey(definition, config) {

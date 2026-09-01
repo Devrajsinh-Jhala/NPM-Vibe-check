@@ -35,7 +35,7 @@ The counter is live rather than hard-coded, and the site links to the source dat
 Review a package without executing it:
 
 ```bash
-npx npx-vibe --check esbuild
+npx npx-vibe esbuild
 ```
 
 Use it as a guarded replacement for `npx`:
@@ -48,7 +48,7 @@ Or install the command globally:
 
 ```bash
 npm install -g npx-vibe
-npx-vibe --check <package>
+npx-vibe <package>
 ```
 
 Scan an existing project's direct dependencies:
@@ -93,8 +93,8 @@ Example envelope:
 
 ```json
 {
-  "schemaVersion": 1,
-  "tool": { "name": "npx-vibe", "version": "1.6.0" },
+  "schemaVersion": 2,
+  "tool": { "name": "npx-vibe", "version": "2.0.0" },
   "kind": "package-scan",
   "status": "complete",
   "decision": {
@@ -119,7 +119,7 @@ Example envelope:
 }
 ```
 
-The complete deterministic report remains under `report`. Require `schemaVersion === 1`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. The outer `npx --yes` only suppresses npm's download prompt; agent mode rejects npx-vibe's execution flags such as `--force` and `--yes`.
+The complete deterministic report remains under `report`. Require `schemaVersion === 2`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. The outer `npx --yes` only suppresses npm's download prompt; agent mode rejects npx-vibe's execution flags such as `--force` and `--yes`.
 
 AI remains off by default in agent mode. If a user explicitly requests model interpretation, use a provider-specific environment variable and add `--ai online --provider <provider>`; never place a key in a generated command.
 
@@ -142,19 +142,20 @@ Add this server configuration to an MCP client that supports local stdio servers
 
 Global installations can use `npx-vibe-mcp` as the command with no arguments. Run `npx npx-vibe --mcp --help` for server-specific help.
 
-The server exposes three schema-backed tools:
+The server exposes four schema-backed tools:
 
 | MCP tool | Purpose |
 | --- | --- |
 | `scan_package` | Resolve, verify, and inspect one public npm package without executing it |
-| `scan_project` | Review direct registry dependencies from a project manifest or lockfile |
-| `list_models` | Return the bundled provider and model-profile catalog without a network request |
+| `scan_project` | Review the dependency tree from a project manifest and lockfile |
+| `approve_scripts` | Decide which dependencies may run install scripts under npm 12 |
+| `list_providers` | Return supported AI providers and where each publishes its model list |
 
 Scan results return the same versioned decision contract in both `structuredContent` and a JSON text block for client compatibility. The tools are annotated read-only and non-destructive. `review` still requires human approval, while `stop`, `retry`, and MCP tool errors fail closed.
 
 AI remains off unless a tool call explicitly selects it. API keys are intentionally excluded from MCP tool arguments: configure provider-specific environment variables on the MCP server process so credentials do not enter prompts or tool history.
 
-`npx-vibe@1.6.0` is [active in the official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe) as `io.github.Devrajsinh-Jhala/npx-vibe`. Registry clients can resolve the verified npm package and start its local stdio server with `--mcp`.
+`npx-vibe@2.0.0` is [active in the official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe) as `io.github.Devrajsinh-Jhala/npx-vibe`. Registry clients can resolve the verified npm package and start its local stdio server with `--mcp`.
 
 ## Why developers use it
 
@@ -178,7 +179,7 @@ By default, execution uses npm with install scripts ignored. Use `--allow-instal
 Every deterministic source finding includes the matched line and a bounded excerpt. Registry popularity is displayed separately as context and never overrides suspicious code. Local review memory is keyed by the verified package integrity—not merely its name or version. The example below mirrors a real scan; registry dates and download counts naturally change over time.
 
 ```text
-$ npx npx-vibe --check esbuild
+$ npx npx-vibe esbuild
 ! npx-vibe: Caution  risk 43/100
 esbuild@0.28.1
 
@@ -205,12 +206,12 @@ A popular package can still receive **Caution** when it performs sensitive insta
 When AI is explicitly enabled, the resolved provider and model are visible in the result. This example is adapted from the successful Gemini 3.5 Flash run on June 25, 2026; model wording can vary:
 
 ```text
-$ npx npx-vibe --check --ai online --provider gemini --model-profile balanced esbuild
+$ npx npx-vibe --ai online --provider gemini --model gemini-3.5-flash esbuild
 ! npx-vibe: Caution  risk 43/100
 esbuild@0.28.1
 
 Install hooks: postinstall
-AI review: Gemini gemini-3.5-flash [balanced] (high confidence)
+AI review: Gemini gemini-3.5-flash (high confidence)
 AI evidence: 0 source-backed findings
 
 AI interpretation: The selected install script appears to resolve a platform-specific binary.
@@ -224,7 +225,8 @@ Action: review recommended before execution.
 
 | Area | Signals |
 | --- | --- |
-| Registry context | package age, version age, weekly downloads, maintainers, publisher, license, deprecation |
+| Known vulnerabilities | OSV.dev advisories for the exact resolved version, with CVE aliases and severity. No API key; batched across a whole tree |
+| Registry context | package age, version age, weekly downloads, maintainers, publisher, license, deprecation. Reported, never scored |
 | Install behavior | `preinstall`, `install`, `postinstall`, and their script targets. `prepare`, `prepublish`, `preprepare`, and `postprepare` are reported separately as context, because npm does not run them when a published tarball is installed |
 | Tarball safety | npm integrity verification, unsafe paths, escaping symlinks, archive size and entry limits |
 | Source behavior | secret/environment access, network calls, shell execution, external payloads, obfuscation, persistence, mining indicators |
@@ -259,21 +261,28 @@ The history file stores package versions, integrity hashes, selected-file hashes
 | **Block** | Critical behavior or a high-risk review result was detected | `3` |
 | Operational error | Registry, network, input, or internal failure | `1` |
 
+Registry context — package age, version age, and download volume — is reported at the `info` severity and never contributes to the score. It describes how new a package is, not whether it does anything.
+
 A verdict is a decision aid, not proof that a package is safe or malicious.
 
 ## Usage
 
 ```text
-npx-vibe [options] <package-spec> [-- package arguments]
-npx-vibe --project <directory|package.json> [options]
+npx-vibe [options] <package-spec>                      # scan a package
+npx-vibe run [options] <package-spec> [-- arguments]   # scan, then execute
+npx-vibe approve-scripts [options] [--write]           # settle npm 12 allowScripts
+npx-vibe --project <directory|package.json> [options]  # scan a dependency tree
 npx-vibe --mcp
 ```
+
+Scanning never executes package code. `npx-vibe run` is the only command that
+does, and it still refuses a Block verdict unless you pass `--force`.
 
 Common commands:
 
 ```bash
-# Heuristic-only review; do not execute
-npx npx-vibe --check <package>
+# Scan a package; nothing is executed
+npx npx-vibe <package>
 
 # Machine-readable output
 npx npx-vibe --json <package>
@@ -282,16 +291,20 @@ npx npx-vibe --json <package>
 npx --yes npx-vibe@latest --agent <package>
 
 # Review, then execute when permitted
-npx npx-vibe <package> -- <arguments>
+npx npx-vibe run <package> -- <arguments>
 
 # Select one executable from a package with multiple binaries
-npx npx-vibe --bin tsc typescript -- --version
+npx npx-vibe run --bin tsc typescript -- --version
+
+# Decide which dependencies may run install scripts under npm 12
+npx npx-vibe approve-scripts
+npx npx-vibe approve-scripts --write
 
 # Scan production and optional dependencies from this project
 npx npx-vibe --project .
 
-# Scan the whole installed tree from package-lock.json
-npx-vibe --project . --transitive
+# Scan only the direct dependencies named in package.json
+npx npx-vibe --project . --direct-only
 
 # Include direct development dependencies
 npx npx-vibe --project . --include-dev
@@ -306,23 +319,23 @@ npx --yes npx-vibe@latest --agent --project .
 npx --yes npx-vibe@latest --mcp
 
 # Execute a Caution verdict without prompting
-npx npx-vibe --yes <package>
+npx npx-vibe run --yes <package>
 
 # Execute a Block verdict intentionally
-npx npx-vibe --force <package>
+npx npx-vibe run --force <package>
 ```
 
 Useful options:
 
 ```text
---check
 --json
 --agent
 --mcp
 --project <path>
 --include-dev
---transitive
+--direct-only
 --max-packages <1-5000>
+--no-advisories
 --ci
 --concurrency <1-8>
 --ai-limit <0-100>
@@ -332,7 +345,6 @@ Useful options:
 --ai off|auto|online|ollama
 --provider auto|openai|anthropic|gemini|openrouter|groq|together|custom
 --models
---model-profile fast|balanced|strong
 --model <name>
 --api-key <key>
 --api-url <url>
@@ -346,6 +358,7 @@ Useful options:
 --allow-install-scripts
 --no-history
 --history-file <path>
+--check                     (deprecated; scanning is the default and this is a no-op)
 --no-color
 ```
 
@@ -361,11 +374,13 @@ npx npx-vibe --project .
 
 It reads `package.json` and, when present, `package-lock.json` locally. Exact versions from npm lockfiles are preferred over version ranges. By default it scans direct `dependencies` and `optionalDependencies`; add `--include-dev` for `devDependencies`.
 
-Add `--transitive` to review every registry-resolved package in `package-lock.json` rather than only the direct ones. Supply-chain compromises usually arrive through a transitive dependency, so this is the broader check, at the cost of many more registry lookups:
+Every registry-resolved package in `package-lock.json` is reviewed, not only the direct ones, because supply-chain compromises usually arrive transitively. Pass `--direct-only` for the narrower, faster check:
 
 ```bash
-npx npx-vibe --project . --transitive
+npx npx-vibe --project . --direct-only
 ```
+
+Without a lockfile the scan degrades to direct dependencies and says so, rather than failing.
 
 ```text
 ! npx-vibe project: Caution  highest risk 43/100
@@ -386,7 +401,7 @@ Action: review the flagged dependencies and their evidence individually.
 
 The workflow is deliberately bounded:
 
-- Direct registry dependencies are scanned by default. `--transitive` walks the whole installed tree from `package-lock.json`; without a lockfile it is an error rather than a partial answer.
+- The whole installed tree from `package-lock.json` is scanned by default. `--direct-only` narrows it to the dependencies named in `package.json`.
 - `--max-packages` (default 500) caps how many packages one scan reviews. Anything past the cap is reported as skipped, never silently dropped.
 - Workspace, local, alias, URL, and Git specs are reported as skipped rather than uploaded or resolved through another trust path.
 - Heuristic-only scans use three concurrent reviews by default (`--concurrency 1-8`). Weekly download counts for the whole scan are fetched through npm's bulk endpoint in a single request.
@@ -455,42 +470,28 @@ Online AI receives bounded package metadata, deterministic findings, install scr
 
 AI findings are checked against the inspected source before they are displayed as evidence. A model finding records its file, line, exact excerpt, and rationale. Unsupported model claims are omitted from the source-backed findings section, and an unsupported AI recommendation cannot independently produce a Block verdict.
 
-### Choose a model without memorizing provider catalogs
+### Naming the model is required
 
-The default online profile is `balanced`. It aims for a practical mix of review quality, latency, and cost. You can inspect the complete bundled mapping without configuring a key:
+`npx-vibe` ships **no model catalog**. A pinned model id rots: when a provider retires one, the call fails, the review becomes `ai_unavailable`, the score is floored, and the package reports a **false Caution**. A scanner whose accuracy decays on a timer is worse than one that asks you to name the model.
+
+```bash
+npx npx-vibe --ai online --provider anthropic --model <id> <package>
+npx npx-vibe --ai online --provider gemini --model <id> <package>
+```
+
+`--models` lists every supported provider, the environment variable it reads its key from, and where that provider publishes its current model list:
 
 ```bash
 npx npx-vibe --models
 ```
 
-Choose a simple profile:
+Official model lists: [OpenAI](https://platform.openai.com/docs/models), [Anthropic](https://docs.anthropic.com/en/docs/about-claude/models), [Gemini](https://ai.google.dev/gemini-api/docs/models), [OpenRouter](https://openrouter.ai/models), [Groq](https://console.groq.com/docs/models), and [Together](https://docs.together.ai/docs/serverless-models).
+
+Local models need no key and keep their own default:
 
 ```bash
-npx npx-vibe --check --ai online --provider anthropic --model-profile fast <package>
-npx npx-vibe --check --ai online --provider openai --model-profile balanced <package>
-npx npx-vibe --check --ai online --provider gemini --model-profile strong <package>
+npx npx-vibe --ai ollama --ollama-model qwen2.5-coder <package>
 ```
-
-Or pin any provider-supported model:
-
-```bash
-npx npx-vibe --check --ai online --provider gemini --model gemini-3.5-flash <package>
-```
-
-Bundled recommendations, verified **June 25, 2026**:
-
-| Provider | Fast | Balanced (default) | Strong |
-| --- | --- | --- | --- |
-| OpenAI | `gpt-5.4-nano` | `gpt-5.4-mini` | `gpt-5.5` |
-| Anthropic | `claude-haiku-4-5` | `claude-sonnet-4-6` | `claude-opus-4-8` |
-| Gemini | `gemini-3.1-flash-lite` | `gemini-3.5-flash` | `gemini-3.5-flash` |
-| OpenRouter | `openrouter/auto` | `openrouter/auto` | `openrouter/auto` |
-| Groq | `openai/gpt-oss-20b` | `openai/gpt-oss-120b` | `openai/gpt-oss-120b` |
-| Together AI | `Qwen/Qwen3.5-9B` | `Qwen/Qwen3.5-9B` | `deepseek-ai/DeepSeek-V4-Pro` |
-
-Official references: [OpenAI models](https://developers.openai.com/api/docs/guides/latest-model), [Anthropic models](https://platform.claude.com/docs/en/about-claude/models/overview), [Gemini models](https://ai.google.dev/gemini-api/docs/models), [OpenRouter Auto](https://openrouter.ai/docs/guides/routing/routers/auto-router), [Groq models](https://console.groq.com/docs/models), and [Together serverless models](https://docs.together.ai/docs/serverless/models).
-
-Provider catalogs change independently of `npx-vibe`. The resolved model is always printed, `--model` always wins, and `--models` shows the recommendations bundled with your installed release. Custom OpenAI-compatible endpoints require an explicit `--model`.
 
 ## Automation, agents, and CI
 
@@ -529,7 +530,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npx --yes npx-vibe@1.6.0 --project . --include-dev --ci
+      - run: npx --yes npx-vibe@2.0.0 --project . --include-dev --ci
 ```
 
 Project mode preserves the normal exit contract: `0` Proceed, `2` Caution, `3` Block, and `1` for an incomplete scan caused by an operational error. `--ci` and `--json` are intentionally separate so JSON output remains valid.
@@ -545,8 +546,7 @@ NPX_VIBE_AI=off
 NPX_VIBE_PROVIDER=auto
 NPX_VIBE_API_KEY=...
 NPX_VIBE_API_URL=https://api.openai.com/v1/chat/completions
-NPX_VIBE_MODEL_PROFILE=balanced
-NPX_VIBE_MODEL=gpt-5.4-mini
+NPX_VIBE_MODEL=                # required for online AI review
 NPX_VIBE_HISTORY=on
 NPX_VIBE_HISTORY_FILE=~/.npx-vibe/reviews.json
 NPX_VIBE_OLLAMA_URL=http://127.0.0.1:11434
@@ -558,6 +558,7 @@ NPX_VIBE_BLOCK_SCORE=70
 NPX_VIBE_CONCURRENCY=3
 NPX_VIBE_AI_LIMIT=3
 NPX_VIBE_MAX_PACKAGES=500
+NPX_VIBE_ADVISORIES=on         # "off" skips the OSV lookup
 GITHUB_TOKEN=                # optional; raises the GitHub metadata rate limit
 ```
 

@@ -1,7 +1,8 @@
 import { createAgentError, createAgentResult } from "./output.js";
 import { parseArgs, packageVersion, reviewPackage } from "./cli.js";
-import { projectExitCode, scanProject } from "./project.js";
-import { providerModelCatalog, modelProfiles } from "./providers.js";
+import { loadProjectManifest, projectExitCode, scanProject } from "./project.js";
+import { reviewScriptApprovals, scriptApprovalExitCode } from "./scripts.js";
+import { providerCatalog } from "./providers.js";
 import { checkExitCode } from "./verdict.js";
 
 export const MCP_PROTOCOL_VERSION = "2025-11-25";
@@ -17,7 +18,6 @@ const MAX_CONCURRENT_REQUESTS = 4;
 const JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema";
 const AI_MODES = ["off", "auto", "online", "ollama"];
 const PROVIDERS = ["auto", "openai", "anthropic", "gemini", "openrouter", "groq", "together", "custom"];
-const MODEL_PROFILES = ["fast", "balanced", "strong"];
 
 const COMMON_AI_PROPERTIES = {
   ai: {
@@ -32,16 +32,10 @@ const COMMON_AI_PROPERTIES = {
     default: "auto",
     description: "AI provider. Credentials are read from environment variables, never tool arguments.",
   },
-  modelProfile: {
-    type: "string",
-    enum: MODEL_PROFILES,
-    default: "balanced",
-    description: "Maintained quality, latency, and cost profile.",
-  },
   model: {
     type: "string",
     minLength: 1,
-    description: "Optional exact provider model identifier.",
+    description: "Provider model identifier. Required when ai is not off, because no model catalog is bundled.",
   },
 };
 
@@ -49,7 +43,7 @@ const AGENT_OUTPUT_SCHEMA = {
   $schema: JSON_SCHEMA,
   type: "object",
   properties: {
-    schemaVersion: { type: "integer", const: 1 },
+    schemaVersion: { type: "integer", const: 2 },
     tool: {
       type: "object",
       properties: {
@@ -120,7 +114,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "scan_project",
     title: "Scan project dependencies",
-    description: "Inspect public-registry dependencies from package.json and package-lock.json without installing or executing them. Direct dependencies by default; set transitive to walk the whole installed tree. Use after dependency or lockfile changes and before installation.",
+    description: "Inspect public-registry dependencies from package.json and package-lock.json without installing or executing them. Walks the whole installed tree by default; set directOnly for package.json dependencies alone. Use after dependency or lockfile changes and before installation.",
     inputSchema: {
       $schema: JSON_SCHEMA,
       type: "object",
@@ -136,10 +130,10 @@ const TOOL_DEFINITIONS = [
           default: false,
           description: "Include devDependencies in addition to production and optional dependencies.",
         },
-        transitive: {
+        directOnly: {
           type: "boolean",
           default: false,
-          description: "Scan every registry-resolved package in package-lock.json, not only direct dependencies. Requires a lockfile and scans many more packages.",
+          description: "Scan only the direct dependencies named in package.json. By default every registry-resolved package in package-lock.json is scanned.",
         },
         maxPackages: {
           type: "integer",
@@ -171,9 +165,43 @@ const TOOL_DEFINITIONS = [
     execution: { taskSupport: "forbidden" },
   },
   {
-    name: "list_models",
-    title: "List recommended AI models",
-    description: "Return the provider model recommendations bundled with this npx-vibe release. This does not access a model provider or require credentials.",
+    name: "approve_scripts",
+    title: "Decide npm install-script permissions",
+    description: "Review every dependency npm would allow to run an install script, and return approve, review, or deny for each with the source evidence behind it. Reads package-lock.json and never executes a script. Use when npm reports pending allowScripts entries or after a lockfile change adds one.",
+    inputSchema: {
+      $schema: JSON_SCHEMA,
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          minLength: 1,
+          default: ".",
+          description: "Project directory or package.json path.",
+        },
+        all: {
+          type: "boolean",
+          default: false,
+          description: "Re-review packages already recorded in allowScripts.",
+        },
+        concurrency: {
+          type: "integer",
+          minimum: 1,
+          maximum: 8,
+          default: 3,
+          description: "Maximum concurrent package reviews.",
+        },
+        ...COMMON_AI_PROPERTIES,
+      },
+      additionalProperties: false,
+    },
+    outputSchema: AGENT_OUTPUT_SCHEMA,
+    annotations: readOnlyAnnotations("Review npm install scripts", true),
+    execution: { taskSupport: "forbidden" },
+  },
+  {
+    name: "list_providers",
+    title: "List supported AI providers",
+    description: "Return the AI providers npx-vibe can call, the environment variable each reads its key from, and where that provider publishes its current model list. No model catalog is bundled, so a model must be named explicitly. This does not access a provider or require credentials.",
     inputSchema: {
       $schema: JSON_SCHEMA,
       type: "object",
@@ -183,15 +211,13 @@ const TOOL_DEFINITIONS = [
       $schema: JSON_SCHEMA,
       type: "object",
       properties: {
-        schemaVersion: { type: "integer", const: 1 },
+        schemaVersion: { type: "integer", const: 2 },
         tool: { type: "object" },
-        defaultProfile: { type: "string" },
-        profiles: { type: "array", items: { type: "string" } },
         providers: { type: "array", items: { type: "object" } },
       },
-      required: ["schemaVersion", "tool", "defaultProfile", "profiles", "providers"],
+      required: ["schemaVersion", "tool", "providers"],
     },
-    annotations: readOnlyAnnotations("List npx-vibe models", false),
+    annotations: readOnlyAnnotations("List npx-vibe providers", false),
     execution: { taskSupport: "forbidden" },
   },
 ];
@@ -203,6 +229,8 @@ export class NpxVibeMcpServer {
     this.cwd = options.cwd ?? process.cwd();
     this.reviewPackageFn = options.reviewPackage ?? reviewPackage;
     this.scanProjectFn = options.scanProject ?? scanProject;
+    this.loadProjectFn = options.loadProjectManifest ?? loadProjectManifest;
+    this.reviewScriptApprovalsFn = options.reviewScriptApprovals ?? reviewScriptApprovals;
     this.initialized = false;
   }
 
@@ -261,7 +289,7 @@ export class NpxVibeMcpServer {
         version: this.version,
         description: "Read-only npm package and project dependency preflight tools.",
       },
-      instructions: "Use scan_package before unfamiliar npm install or execution actions and scan_project after dependency changes. Continue only when decision.action is continue. Caution requires human review; Block and incomplete scans must stop.",
+      instructions: "Use scan_package before unfamiliar npm install or execution actions, scan_project after dependency changes, and approve_scripts when npm reports pending allowScripts entries. Continue only when decision.action is continue. Caution requires human review; Block and incomplete scans must stop.",
     };
   }
 
@@ -285,16 +313,18 @@ export class NpxVibeMcpServer {
         return this.scanPackageTool(args);
       case "scan_project":
         return this.scanProjectTool(args);
-      case "list_models":
+      case "approve_scripts":
+        return this.approveScriptsTool(args);
+      case "list_providers":
         validateArguments(args, new Set(), {});
-        return toolResult(this.modelCatalog());
+        return toolResult(this.providerCatalog());
       default:
         throw new McpProtocolError(-32602, `Unknown tool: ${params.name}`);
     }
   }
 
   async scanPackageTool(args) {
-    validateArguments(args, new Set(["package", "ai", "provider", "modelProfile", "model"]), {
+    validateArguments(args, new Set(["package", "ai", "provider", "model"]), {
       requiredStrings: ["package"],
     });
     // The spec is handed to the CLI parser as a positional, so a value starting
@@ -322,11 +352,11 @@ export class NpxVibeMcpServer {
 
   async scanProjectTool(args) {
     validateArguments(args, new Set([
-      "path", "includeDev", "transitive", "maxPackages", "concurrency", "aiLimit",
-      "ai", "provider", "modelProfile", "model",
+      "path", "includeDev", "directOnly", "maxPackages", "concurrency", "aiLimit",
+      "ai", "provider", "model",
     ]), {
       optionalStrings: ["path"],
-      booleans: ["includeDev", "transitive"],
+      booleans: ["includeDev", "directOnly"],
       boundedIntegers: {
         concurrency: [1, 8],
         aiLimit: [0, 100],
@@ -351,13 +381,35 @@ export class NpxVibeMcpServer {
     }
   }
 
-  modelCatalog() {
+  async approveScriptsTool(args) {
+    validateArguments(args, new Set(["path", "all", "concurrency", "ai", "provider", "model"]), {
+      optionalStrings: ["path"],
+      booleans: ["all"],
+      boundedIntegers: { concurrency: [1, 8] },
+    });
+    const config = createScanConfig(args, "approve-scripts", this.env, this.cwd);
+
+    try {
+      const project = this.loadProjectFn(config.projectPath, config);
+      const report = await this.reviewScriptApprovalsFn(project, config, this.reviewPackageFn);
+      return toolResult(createAgentResult(report, {
+        kind: "script-approvals",
+        exitCode: scriptApprovalExitCode(report),
+        version: this.version,
+      }));
+    } catch (error) {
+      return toolResult(createAgentError(error, {
+        code: "approve_scripts_failed",
+        version: this.version,
+      }), true);
+    }
+  }
+
+  providerCatalog() {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       tool: { name: "npx-vibe", version: this.version },
-      defaultProfile: "balanced",
-      profiles: modelProfiles(),
-      providers: providerModelCatalog(),
+      providers: providerCatalog(),
     };
   }
 }
@@ -430,13 +482,17 @@ async function handleLine(server, line, output) {
 function createScanConfig(args, kind, env, cwd) {
   const argv = ["--agent", "--ai", args.ai ?? "off"];
   if (args.provider !== undefined) argv.push("--provider", args.provider);
-  if (args.modelProfile !== undefined) argv.push("--model-profile", args.modelProfile);
   if (args.model !== undefined) argv.push("--model", args.model);
 
-  if (kind === "project") {
+  if (kind === "approve-scripts") {
+    argv.unshift("approve-scripts");
+    argv.push("--project", args.path ?? ".");
+    if (args.all) argv.push("--all");
+    if (args.concurrency !== undefined) argv.push("--concurrency", String(args.concurrency));
+  } else if (kind === "project") {
     argv.push("--project", args.path ?? ".");
     if (args.includeDev) argv.push("--include-dev");
-    if (args.transitive) argv.push("--transitive");
+    if (args.directOnly) argv.push("--direct-only");
     if (args.maxPackages !== undefined) argv.push("--max-packages", String(args.maxPackages));
     if (args.concurrency !== undefined) argv.push("--concurrency", String(args.concurrency));
     if (args.aiLimit !== undefined) argv.push("--ai-limit", String(args.aiLimit));
@@ -477,7 +533,6 @@ function validateArguments(args, allowed, options) {
   }
   validateEnum(args, "ai", AI_MODES);
   validateEnum(args, "provider", PROVIDERS);
-  validateEnum(args, "modelProfile", MODEL_PROFILES);
   if (args.model !== undefined && (typeof args.model !== "string" || !args.model.trim())) {
     throw new McpProtocolError(-32602, "model must be a non-empty string when provided.");
   }

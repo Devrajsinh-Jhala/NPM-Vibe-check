@@ -95,7 +95,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
 
   if (packageAgeDays !== null && packageAgeDays < ageThresholdDays) {
     findings.push({
-      severity: "low",
+      severity: "info",
       code: "young_package",
       file: null,
       detail: `Package was created ${formatDays(packageAgeDays)} ago.`,
@@ -104,7 +104,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
 
   if (versionAgeDays !== null && versionAgeDays < ageThresholdDays) {
     findings.push({
-      severity: "low",
+      severity: "info",
       code: "young_version",
       file: null,
       detail: `This version was published ${formatDays(versionAgeDays)} ago.`,
@@ -113,7 +113,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
 
   if (weeklyDownloads !== null && weeklyDownloads < downloadsThreshold) {
     findings.push({
-      severity: "low",
+      severity: "info",
       code: "low_downloads",
       file: null,
       detail: `Package had ${weeklyDownloads.toLocaleString("en-US")} downloads last week.`,
@@ -122,7 +122,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
 
   if (weeklyDownloads === null) {
     findings.push({
-      severity: "low",
+      severity: "info",
       code: "downloads_unavailable",
       file: null,
       detail: `Could not load npm download counts${snapshot.downloads?.error ? `: ${snapshot.downloads.error}` : "."}`,
@@ -206,8 +206,11 @@ export function scoreFindings(findings) {
     return 100;
   }
 
+  // Registry context carries the "info" severity and never scores. Age and
+  // adoption describe how new a package is, not whether it does anything; they
+  // fired on every healthy release and trained people to ignore the output.
   const uniqueByCode = new Map();
-  for (const finding of findings) {
+  for (const finding of findings.filter((finding) => finding.severity !== "info")) {
     if (!uniqueByCode.has(finding.code)) {
       uniqueByCode.set(finding.code, finding);
     }

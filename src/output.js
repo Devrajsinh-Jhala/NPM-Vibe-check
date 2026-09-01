@@ -46,8 +46,7 @@ export function renderDashboard(result, options = {}) {
   lines.push(...reviewHistoryLines(result.history, color));
 
   if (result.ai.status === "ok") {
-    const profile = result.ai.modelSource?.startsWith("profile:") ? ` [${result.ai.modelProfile}]` : "";
-    lines.push(`AI review: ${result.ai.providerLabel ?? result.ai.provider} ${result.ai.model}${profile} (${result.ai.confidence} confidence)`);
+    lines.push(`AI review: ${result.ai.providerLabel ?? result.ai.provider} ${result.ai.model} (${result.ai.confidence} confidence)`);
     const verified = result.ai.findings.filter((finding) => finding.evidenceVerified).length;
     const unsupported = result.ai.unsupportedFindingCount ?? 0;
     lines.push(`AI evidence: ${verified} source-backed ${pluralize("finding", verified)}${unsupported ? `; ${unsupported} unsupported omitted` : ""}`);
@@ -60,7 +59,17 @@ export function renderDashboard(result, options = {}) {
     lines.push(`AI review: unavailable (${target}${trim(result.ai.reason, 240)})`);
   }
 
-  const findings = result.findings.slice(0, 10);
+  const contextFindings = result.findings.filter((finding) => finding.severity === "info");
+  if (contextFindings.length) {
+    lines.push("");
+    lines.push("Registry context (not scored):");
+    for (const finding of contextFindings) {
+      lines.push(color.dim(`- ${finding.code}: ${finding.detail}`));
+    }
+  }
+
+  const scored = result.findings.filter((finding) => finding.severity !== "info");
+  const findings = scored.slice(0, 10);
   if (findings.length) {
     lines.push("");
     lines.push("Findings:");
@@ -73,8 +82,8 @@ export function renderDashboard(result, options = {}) {
         lines.push(color.dim(`  Evidence${location}: ${trim(evidence.excerpt, 180)}`));
       }
     }
-    if (result.findings.length > findings.length) {
-      lines.push(`- … ${result.findings.length - findings.length} more finding(s) omitted`);
+    if (scored.length > findings.length) {
+      lines.push(`- … ${scored.length - findings.length} more finding(s) omitted`);
     }
   }
 
@@ -111,6 +120,11 @@ export function toAgentResult(report, options = {}) {
   return JSON.stringify(createAgentResult(report, options), null, 2);
 }
 
+// Bumped for 2.0.0: registry context moved to the non-scoring "info" severity,
+// project scans became transitive by default, and script-approvals joined the
+// kind enum. A consumer pinned to 1 would misread all three.
+export const SCHEMA_VERSION = 2;
+
 const AGENT_KINDS = new Set(["package-scan", "project-scan", "script-approvals"]);
 
 export function createAgentResult(report, options = {}) {
@@ -123,7 +137,7 @@ export function createAgentResult(report, options = {}) {
     : null;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     tool: {
       name: "npx-vibe",
       version: options.version ?? "unknown",
@@ -154,7 +168,7 @@ export function toAgentError(error, options = {}) {
 
 export function createAgentError(error, options = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     tool: {
       name: "npx-vibe",
       version: options.version ?? "unknown",
@@ -323,6 +337,9 @@ export function renderProjectDashboard(scan, options = {}) {
         : "package.json ranges (no package-lock.json found)"}`,
   ];
 
+  if (scan.project.transitiveFallback) {
+    lines.push(color.yellow("No package-lock.json found; scanned direct dependencies only."));
+  }
   if (scan.project.lockfileError) {
     lines.push(color.yellow(`Lockfile warning: ${trim(scan.project.lockfileError, 180)}`));
   }
@@ -462,9 +479,9 @@ function markdownCell(value) {
 
 function prioritizedFindings(findings = []) {
   const ranks = { critical: 4, high: 3, medium: 2, low: 1 };
-  return [...findings].sort((left, right) =>
-    (ranks[right.severity] ?? 0) - (ranks[left.severity] ?? 0)
-  );
+  return findings
+    .filter((finding) => finding.severity !== "info")
+    .sort((left, right) => (ranks[right.severity] ?? 0) - (ranks[left.severity] ?? 0));
 }
 
 function profileLines(result) {
@@ -542,13 +559,14 @@ function reviewHistoryLines(history, color) {
 }
 
 function actionLine(result, color) {
+  const name = result.package?.name ?? "<package>";
   if (result.verdict.verdict === "proceed") {
-    return color.green("Action: package may be executed.");
+    return color.green(`Action: nothing blocking found. Run it with: npx-vibe run ${name}`);
   }
   if (result.verdict.verdict === "caution") {
-    return color.yellow("Action: review recommended before execution.");
+    return color.yellow("Action: read the evidence above before running this package.");
   }
-  return color.red("Action: blocked unless --force is supplied.");
+  return color.red(`Action: blocked. npx-vibe run ${name} --force overrides this deliberately.`);
 }
 
 function colorSeverity(severity, color) {

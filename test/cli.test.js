@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findBinCommand, parseArgs } from "../src/cli.js";
+import { findBinCommand, parseArgs, resolveNpmLauncher } from "../src/cli.js";
 import { maybeRunAiReview } from "../src/ai.js";
 
 test("parseArgs defaults to heuristic-only even when provider keys exist", () => {
@@ -33,19 +33,18 @@ test("heuristic-only mode skips AI without reporting it unavailable", async () =
 });
 
 test("parseArgs supports no-hassle online and package args", () => {
-  const args = parseArgs(["--ai", "online", "--model=gpt-test", "cowsay", "--", "hello"], {});
+  const args = parseArgs(["run", "--ai", "online", "--model=gpt-test", "cowsay", "--", "hello"], {});
+  assert.equal(args.command, "run");
   assert.equal(args.aiMode, "online");
   assert.equal(args.model, "gpt-test");
   assert.equal(args.packageSpec, "cowsay");
   assert.deepEqual(args.packageArgs, ["hello"]);
 });
 
-test("parseArgs supports model profiles and model catalog without a package", () => {
-  const profileArgs = parseArgs(["--model-profile", "strong", "--check", "esbuild"], {});
-  const catalogArgs = parseArgs(["--models"], {});
-  assert.equal(profileArgs.modelProfile, "strong");
-  assert.equal(catalogArgs.models, true);
-  assert.throws(() => parseArgs(["--model-profile", "unknown", "esbuild"], {}), /fast, balanced, strong/);
+test("model profiles are gone and --models lists providers", () => {
+  assert.equal(parseArgs(["--models"], {}).models, true);
+  assert.equal(parseArgs(["--model", "some-model", "esbuild"], {}).model, "some-model");
+  assert.throws(() => parseArgs(["--model-profile", "strong", "esbuild"], {}), /Unknown option/);
 });
 
 test("findBinCommand picks obvious bin names", () => {
@@ -55,7 +54,7 @@ test("findBinCommand picks obvious bin names", () => {
 });
 
 test("--bin selects a named executable from multi-bin packages", () => {
-  const args = parseArgs(["--bin", "tsc", "typescript", "--", "--version"], {});
+  const args = parseArgs(["run", "--bin", "tsc", "typescript", "--", "--version"], {});
   assert.equal(args.bin, "tsc");
   assert.deepEqual(args.packageArgs, ["--version"]);
   assert.equal(
@@ -118,10 +117,29 @@ test("--agent supports project scans and explicit AI opt-in", () => {
 });
 
 test("--agent rejects execution-oriented options and package arguments", () => {
+  // --agent is read-only whether or not the run command is used; that is the
+  // more useful message, so it is checked before the run-only guard.
   assert.throws(() => parseArgs(["--agent", "--force", "esbuild"], {}), /read-only/);
   assert.throws(() => parseArgs(["--agent", "--yes", "esbuild"], {}), /read-only/);
   assert.throws(() => parseArgs(["--agent", "--allow-install-scripts", "esbuild"], {}), /read-only/);
-  assert.throws(() => parseArgs(["--agent", "typescript", "--", "--version"], {}), /does not accept/);
+  assert.throws(() => parseArgs(["run", "--agent", "--force", "esbuild"], {}), /read-only/);
+  assert.throws(() => parseArgs(["--agent", "typescript", "--", "--version"], {}), /only apply to/);
+});
+
+test("scanning is the default and execution is an explicit command", () => {
+  assert.equal(parseArgs(["esbuild"], {}).command, "scan");
+  assert.equal(parseArgs(["run", "esbuild"], {}).command, "run");
+  // Execution flags are meaningless without the run command.
+  assert.throws(() => parseArgs(["--yes", "esbuild"], {}), /npx-vibe run/);
+  assert.deepEqual(parseArgs(["run", "cowsay", "--", "moo"], {}).packageArgs, ["moo"]);
+});
+
+test("project scans are transitive by default and --direct-only opts out", () => {
+  assert.equal(parseArgs(["--project", "."], {}).transitive, true);
+  assert.equal(parseArgs(["--project", ".", "--direct-only"], {}).transitive, false);
+  assert.equal(parseArgs(["--project", ".", "--direct-only"], {}).transitiveExplicit, true);
+  assert.equal(parseArgs(["--project", "."], {}).transitiveExplicit, false);
+  assert.throws(() => parseArgs(["--direct-only", "esbuild"], {}), /requires --project/);
 });
 
 test("project-only flags reject ambiguous package mode combinations", () => {
@@ -130,4 +148,30 @@ test("project-only flags reject ambiguous package mode combinations", () => {
   assert.throws(() => parseArgs(["--project", ".", "esbuild"], {}), /either --project/);
   assert.throws(() => parseArgs(["--project", ".", "--bin", "tool"], {}), /not project scans/);
   assert.throws(() => parseArgs(["--project", ".", "--ci", "--json"], {}), /either --ci or --json/);
+});
+
+test("npm is launched without a shell on every platform", () => {
+  const args = ["exec", "--yes", "--package", "cowsay@1.6.0"];
+
+  // Node refuses to spawn npm.cmd without a shell, so Windows must reach npm's
+  // JavaScript entry point directly rather than the .cmd shim.
+  const viaNpx = resolveNpmLauncher(args, {}, { npm_execpath: "C:\npm\bin\npm-cli.js" }, "win32");
+  assert.equal(viaNpx.command, process.execPath);
+  assert.deepEqual(viaNpx.args, ["C:\npm\bin\npm-cli.js", ...args]);
+  assert.equal(viaNpx.via, "npm_execpath");
+
+  // An explicit override always wins.
+  const override = resolveNpmLauncher(args, { npmBin: "/custom/npm" }, {}, "win32");
+  assert.equal(override.command, "/custom/npm");
+  assert.deepEqual(override.args, args);
+
+  // A .cmd shim in npm_execpath is not a JavaScript entry point and is ignored.
+  assert.notEqual(
+    resolveNpmLauncher(args, {}, { npm_execpath: "C:\npm\npm.cmd", APPDATA: "" }, "linux").args[0],
+    "C:\npm\npm.cmd"
+  );
+
+  const posix = resolveNpmLauncher(args, {}, {}, "linux");
+  assert.equal(posix.command, "npm");
+  assert.deepEqual(posix.args, args);
 });

@@ -12,8 +12,9 @@ Inspect npm registry packages before allowing installation or execution. Treat t
 When the `npx-vibe` MCP server is connected, use its native tools instead of launching a shell command:
 
 - `scan_package` for one npm package spec.
-- `scan_project` for registry dependencies from a project manifest; pass `transitive` to cover the whole lockfile tree.
-- `list_models` before selecting an optional AI model.
+- `scan_project` for registry dependencies from a project manifest; the whole lockfile tree is covered by default, pass `directOnly` to narrow it.
+- `approve_scripts` when npm reports pending `allowScripts` entries, or a lockfile change adds a dependency with an install script.
+- `list_providers` before selecting an optional AI model. No model catalog is bundled, so a model must be named explicitly.
 
 Keep AI off unless the user explicitly asks for it or an established workflow requires it. MCP tool calls never accept API keys; provider credentials must come from the server environment.
 
@@ -33,7 +34,9 @@ For the current project's direct registry dependencies:
 npx --yes npx-vibe@latest --agent --project .
 ```
 
-Add `--include-dev` only when development dependencies are in scope. Add `--transitive` when the whole installed tree matters rather than the direct dependencies alone; it needs a `package-lock.json` and reviews many more packages, so prefer it for a deliberate audit rather than a routine check.
+Add `--include-dev` only when development dependencies are in scope. Project scans cover the whole lockfile tree by default; add `--direct-only` for the narrower, faster check.
+
+Scanning never executes a package. Only `npx-vibe run <spec>` does, and it is never the right command for an automated check.
 
 The outer `npx --yes` suppresses npm's package-download prompt; do not pass `--yes` or `--force` to `npx-vibe` itself.
 
@@ -46,7 +49,7 @@ Read `structuredContent` from an MCP result, or parse CLI stdout as JSON, and us
 - `stop`: Do not install or execute the package. Explain the Block verdict and source evidence.
 - `retry`: Treat the scan as incomplete. Report the operational error and do not infer safety from partial results.
 
-Also require `schemaVersion === 1`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. An MCP result with `isError: true` is incomplete and must be treated as `retry`, even when partial details are present.
+Also require `schemaVersion === 2`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. An MCP result with `isError: true` is incomplete and must be treated as `retry`, even when partial details are present.
 
 ## Use AI only when requested
 

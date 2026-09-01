@@ -1,21 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { callResolvedProvider, formatProviderModelCatalog, resolveOnlineProvider } from "../src/providers.js";
+import { callResolvedProvider, formatProviderCatalog, resolveOnlineProvider } from "../src/providers.js";
 import { normalizeRepository } from "../src/profile.js";
 import { normalizeAiReview } from "../src/ai.js";
 import { decideVerdict } from "../src/verdict.js";
 
 test("resolveOnlineProvider auto-detects provider-specific env keys", () => {
-  assert.equal(resolveOnlineProvider({ provider: "auto", apiKeys: { ANTHROPIC_API_KEY: "sk-ant-demo" } }).name, "anthropic");
-  assert.equal(resolveOnlineProvider({ provider: "auto", apiKeys: { GEMINI_API_KEY: "AIza-demo" } }).name, "gemini");
-  assert.equal(resolveOnlineProvider({ provider: "auto", apiKeys: { GROQ_API_KEY: "gsk_demo" } }).name, "groq");
+  assert.equal(resolveOnlineProvider({ provider: "auto", model: "m", apiKeys: { ANTHROPIC_API_KEY: "sk-ant-demo" } }).name, "anthropic");
+  assert.equal(resolveOnlineProvider({ provider: "auto", model: "m", apiKeys: { GEMINI_API_KEY: "AIza-demo" } }).name, "gemini");
+  assert.equal(resolveOnlineProvider({ provider: "auto", model: "m", apiKeys: { GROQ_API_KEY: "gsk_demo" } }).name, "groq");
 });
 
 test("resolveOnlineProvider infers provider from direct api key when possible", () => {
-  assert.equal(resolveOnlineProvider({ provider: "auto", apiKey: "sk-ant-demo" }).name, "anthropic");
-  assert.equal(resolveOnlineProvider({ provider: "auto", apiKey: "AIza-demo" }).name, "gemini");
-  assert.equal(resolveOnlineProvider({ provider: "auto", apiKey: "AO.demo-google-auth-key" }).name, "gemini");
-  assert.equal(resolveOnlineProvider({ provider: "auto", apiKey: "sk-proj-demo" }).name, "openai");
+  assert.equal(resolveOnlineProvider({ provider: "auto", model: "m", apiKey: "sk-ant-demo" }).name, "anthropic");
+  assert.equal(resolveOnlineProvider({ provider: "auto", model: "m", apiKey: "AIza-demo" }).name, "gemini");
+  assert.equal(resolveOnlineProvider({ provider: "auto", model: "m", apiKey: "AO.demo-google-auth-key" }).name, "gemini");
+  assert.equal(resolveOnlineProvider({ provider: "auto", model: "m", apiKey: "sk-proj-demo" }).name, "openai");
 });
 
 test("resolveOnlineProvider refuses to forward an ambiguous direct key", () => {
@@ -38,7 +38,7 @@ test("Gemini uses the API-key header and never puts the key in the URL", async (
 
   try {
     await callResolvedProvider(
-      resolveOnlineProvider({ provider: "auto", apiKey: "AO.demo-google-auth-key" }),
+      resolveOnlineProvider({ provider: "auto", model: "m", apiKey: "AO.demo-google-auth-key" }),
       [{ role: "user", content: "review" }],
       {}
     );
@@ -63,7 +63,7 @@ test("provider errors redact the exact API key", async () => {
   try {
     await assert.rejects(
       () => callResolvedProvider(
-        resolveOnlineProvider({ provider: "openai", apiKey: secret }),
+        resolveOnlineProvider({ provider: "openai", apiKey: secret, model: "test-model" }),
         [{ role: "user", content: "review" }],
         {}
       ),
@@ -96,7 +96,7 @@ test("provider JSON errors are reduced to an actionable one-line message", async
   try {
     await assert.rejects(
       () => callResolvedProvider(
-        resolveOnlineProvider({ provider: "gemini", apiKey: "AO.expired" }),
+        resolveOnlineProvider({ provider: "gemini", apiKey: "AO.expired", model: "test-model" }),
         [{ role: "user", content: "review" }],
         {}
       ),
@@ -163,24 +163,28 @@ test("unsupported AI block recommendations are reduced to caution", () => {
   assert.ok(verdict.score < 70);
 });
 
-test("resolveOnlineProvider defaults to the balanced current model profile", () => {
-  const gemini = resolveOnlineProvider({ provider: "gemini", apiKey: "AIza-demo" });
-  const anthropic = resolveOnlineProvider({ provider: "anthropic", apiKey: "sk-ant-demo" });
-  assert.equal(gemini.model, "gemini-3.5-flash");
-  assert.equal(gemini.modelProfile, "balanced");
-  assert.equal(anthropic.model, "claude-sonnet-4-6");
+test("every provider requires an explicit model", () => {
+  // No catalog is bundled, so there is no default to silently rot.
+  for (const provider of ["gemini", "anthropic", "openai", "groq", "together", "openrouter"]) {
+    assert.throws(
+      () => resolveOnlineProvider({ provider, apiKey: "demo-key" }),
+      /needs an explicit model/,
+      `${provider} should demand --model`
+    );
+  }
 });
 
-test("model profiles are selectable and an exact model wins", () => {
-  assert.equal(resolveOnlineProvider({ provider: "openai", apiKey: "demo", modelProfile: "fast" }).model, "gpt-5.4-nano");
-  const exact = resolveOnlineProvider({
+test("an explicit model is used verbatim and reported as explicit", () => {
+  const gemini = resolveOnlineProvider({
     provider: "gemini",
     apiKey: "AIza-demo",
-    modelProfile: "strong",
     model: "gemini-custom-preview",
   });
-  assert.equal(exact.model, "gemini-custom-preview");
-  assert.equal(exact.modelSource, "explicit");
+  assert.equal(gemini.model, "gemini-custom-preview");
+  assert.equal(gemini.modelSource, "explicit");
+  // The Gemini endpoint interpolates the model into the URL path.
+  assert.match(gemini.url, /models\/gemini-custom-preview:generateContent/);
+  assert.equal(resolveOnlineProvider({ provider: "anthropic", apiKey: "sk-ant-demo", model: "x" }).model, "x");
 });
 
 test("resolveOnlineProvider supports explicit custom OpenAI-compatible endpoint", () => {
@@ -200,15 +204,16 @@ test("custom OpenAI-compatible endpoints require an exact model", () => {
     provider: "custom",
     apiKey: "test-key",
     apiUrl: "https://models.example.test/v1/chat/completions",
-  }), /require --model/);
+  }), /needs an explicit model/);
 });
 
-test("model catalog exposes current recommendations without retired defaults", () => {
-  const catalog = formatProviderModelCatalog();
-  assert.match(catalog, /gemini-3\.5-flash/);
-  assert.match(catalog, /claude-sonnet-4-6/);
-  assert.match(catalog, /gpt-5\.4-mini/);
-  assert.doesNotMatch(catalog, /gemini-1\.5|claude-3-5|gpt-4\.1-mini/);
+test("the provider catalog names keys and model docs, never model ids", () => {
+  const catalog = formatProviderCatalog();
+  assert.match(catalog, /ANTHROPIC_API_KEY/);
+  assert.match(catalog, /docs\.anthropic\.com/);
+  assert.match(catalog, /ai\.google\.dev/);
+  // A bundled id is exactly what this release removed.
+  assert.doesNotMatch(catalog, /gemini-[0-9]|claude-[a-z]+-[0-9]|gpt-[0-9]/);
 });
 
 test("normalizeRepository extracts GitHub slugs from common npm repository values", () => {

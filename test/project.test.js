@@ -203,8 +203,18 @@ test("transitive scanning requires a lockfile", async () => {
     dependencies: { alpha: "^1.0.0" },
   }));
 
+  // An explicit --transitive is a hard requirement...
   await assert.rejects(
-    () => scanProject(directory, { transitive: true }, async () => ({ result: {} })),
+    () => scanProject(directory, { transitive: true, transitiveExplicit: true }, async () => ({ result: {} })),
     /needs a package-lock\.json/
   );
+
+  // ...but the v2 default degrades to direct dependencies and says so, rather
+  // than failing a scan on a freshly cloned repository.
+  const fallback = await scanProject(directory, { transitive: true }, async () => ({
+    result: { verdict: { verdict: "proceed", score: 0 }, findings: [], package: { name: "alpha" } },
+  }));
+  assert.equal(fallback.project.transitive, false);
+  assert.equal(fallback.project.transitiveFallback, true);
+  assert.equal(fallback.summary.discovered, 1);
 });

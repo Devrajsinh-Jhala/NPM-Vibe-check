@@ -282,3 +282,39 @@ test("credential theft in an install script target is still critical", () => {
   assert.ok(analysis.findings.some((finding) => finding.code === "possible_secret_exfiltration"));
   assert.equal(decideVerdict(analysis, { status: "skipped" }).verdict, "block");
 });
+
+test("registry context is reported but never scored", () => {
+  // A brand-new package with few downloads and no behaviour of any kind. In v1
+  // this scored on age and adoption alone; those describe how new a package is,
+  // not whether it does anything.
+  const manifest = { name: "brand-new", version: "0.1.0", bin: "cli.js" };
+  const analysis = analyzePackage(fakeSnapshot(manifest), {
+    findings: [],
+    fileCount: 2,
+    totalUnpackedBytes: 400,
+    packageJson: manifest,
+    selectedFiles: [],
+  });
+
+  const context = analysis.findings.filter((finding) => finding.severity === "info");
+  assert.deepEqual(
+    context.map((finding) => finding.code).sort(),
+    ["low_downloads", "young_package", "young_version"]
+  );
+  assert.equal(analysis.staticScore, 0, "context contributes nothing to the score");
+  assert.equal(decideVerdict(analysis, { status: "skipped" }).verdict, "proceed");
+  // The trigger for an AI review is unchanged; the signal is still available.
+  assert.equal(analysis.needsAi, true);
+});
+
+test("context never masks real behaviour", () => {
+  const manifest = { name: "brand-new", version: "0.1.0", scripts: { postinstall: "node go.js" }, bin: "cli.js" };
+  const analysis = analyzePackage(fakeSnapshot(manifest), {
+    findings: [],
+    fileCount: 2,
+    totalUnpackedBytes: 400,
+    packageJson: manifest,
+    selectedFiles: [],
+  });
+  assert.equal(decideVerdict(analysis, { status: "skipped" }).verdict, "caution");
+});

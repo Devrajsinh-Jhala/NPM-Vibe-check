@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { packageVersion } from "./version.js";
 import { parsePackageSpec } from "./spec.js";
@@ -19,7 +20,7 @@ import {
   toAgentResult,
   toJsonResult,
 } from "./output.js";
-import { formatProviderModelCatalog, modelProfiles } from "./providers.js";
+import { formatProviderCatalog } from "./providers.js";
 import { loadProjectManifest, projectExitCode, scanProject } from "./project.js";
 import {
   applyAllowScripts,
@@ -79,7 +80,7 @@ export async function run(argv, env = process.env) {
   }
 
   if (config.models) {
-    console.log(formatProviderModelCatalog());
+    console.log(formatProviderCatalog());
     return 0;
   }
 
@@ -129,8 +130,8 @@ export async function run(argv, env = process.env) {
     color: config.color && process.stdout.isTTY,
   }));
 
-  if (config.check) {
-    return checkExitCode(result.verdict.verdict);
+  if (config.command !== "run") {
+    return exitCode;
   }
 
   const permitted = await confirmExecution(result, config);
@@ -252,10 +253,12 @@ export async function reviewPackage(packageSpecInput, config = {}) {
   };
 }
 
+const SUBCOMMANDS = new Set(["run", "approve-scripts"]);
+
 export function parseArgs(argv, env = process.env) {
   let command = "scan";
-  if (argv[0] === "approve-scripts") {
-    command = "approve-scripts";
+  if (SUBCOMMANDS.has(argv[0])) {
+    command = argv[0];
     argv = argv.slice(1);
   }
   const aiModeExplicit = Boolean(env.NPX_VIBE_AI);
@@ -266,7 +269,6 @@ export function parseArgs(argv, env = process.env) {
     apiUrl: env.NPX_VIBE_API_URL,
     provider: env.NPX_VIBE_PROVIDER ?? env.NPX_VIBE_AI_PROVIDER ?? "auto",
     model: env.NPX_VIBE_MODEL,
-    modelProfile: env.NPX_VIBE_MODEL_PROFILE ?? "balanced",
     appUrl: env.NPX_VIBE_APP_URL,
     aiMaxTokens: numberFromEnv(env.NPX_VIBE_AI_MAX_TOKENS, 4_000),
     apiKeys: {
@@ -301,7 +303,8 @@ export function parseArgs(argv, env = process.env) {
     projectMaxPackages: boundedIntegerFromEnv(env.NPX_VIBE_MAX_PACKAGES, 500, 1, 5_000),
     command,
     includeDev: false,
-    transitive: false,
+    transitive: true,
+    transitiveExplicit: false,
     write: false,
     pin: false,
     all: false,
@@ -373,6 +376,11 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--transitive":
           config.transitive = true;
+          config.transitiveExplicit = true;
+          break;
+        case "--direct-only":
+          config.transitive = false;
+          config.transitiveExplicit = true;
           break;
         case "--write":
           config.write = true;
@@ -431,9 +439,6 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--model":
           config.model = readValue();
-          break;
-        case "--model-profile":
-          config.modelProfile = readValue().toLowerCase();
           break;
         case "--api-key":
           config.apiKey = readValue();
@@ -522,7 +527,7 @@ export function parseArgs(argv, env = process.env) {
     throw new Error("--include-dev requires --project <path>.");
   }
 
-  if (config.transitive && !config.projectPath) {
+  if (config.transitiveExplicit && !config.projectPath) {
     throw new Error("--transitive requires --project <path>.");
   }
 
@@ -536,6 +541,20 @@ export function parseArgs(argv, env = process.env) {
 
   if (config.agent && (config.yes || config.force || config.allowInstallScripts)) {
     throw new Error("--agent is read-only and cannot be combined with --yes, --force, or --allow-install-scripts.");
+  }
+
+  for (const [flag, enabled] of [
+    ["--yes", config.yes],
+    ["--force", config.force],
+    ["--allow-install-scripts", config.allowInstallScripts],
+  ]) {
+    if (enabled && config.command !== "run") {
+      throw new Error(`${flag} only applies to "npx-vibe run", which is the only command that executes a package.`);
+    }
+  }
+
+  if (config.packageArgs.length && config.command !== "run") {
+    throw new Error('Package arguments after -- only apply to "npx-vibe run".');
   }
 
   if (config.agent && config.packageArgs.length) {
@@ -552,10 +571,6 @@ export function parseArgs(argv, env = process.env) {
 
   if (!["auto", "off", "online", "ollama"].includes(config.aiMode)) {
     throw new Error("--ai must be one of: auto, off, online, ollama.");
-  }
-
-  if (!modelProfiles().includes(config.modelProfile)) {
-    throw new Error("--model-profile must be one of: fast, balanced, strong.");
   }
 
   return config;
@@ -592,7 +607,6 @@ export function executePackage(snapshot, manifest, packageArgs, config) {
   const spec = snapshot.spec;
   const binCommand = findBinCommand(manifest, spec, config.bin);
   const npmPackage = `${spec.name}@${snapshot.version}`;
-  const npmBin = config.npmBin ?? (process.platform === "win32" ? "npm.cmd" : "npm");
   const npmArgs = ["exec", "--yes", "--package", npmPackage];
 
   if (config.allowInstallScripts) {
@@ -603,8 +617,10 @@ export function executePackage(snapshot, manifest, packageArgs, config) {
 
   npmArgs.push("--", binCommand, ...packageArgs);
 
+  const launch = resolveNpmLauncher(npmArgs, config);
+
   return new Promise((resolve, reject) => {
-    const child = spawn(npmBin, npmArgs, {
+    const child = spawn(launch.command, launch.args, {
       stdio: "inherit",
       shell: false,
       windowsHide: true,
@@ -619,6 +635,52 @@ export function executePackage(snapshot, manifest, packageArgs, config) {
       }
     });
   });
+}
+
+// Node refuses to spawn a .cmd shim without a shell, so `npm.cmd` fails outright
+// on Windows. Running npm's own JavaScript entry point with the current node
+// binary sidesteps both the shim and the shell, which keeps arguments out of a
+// command-line parser entirely.
+export function resolveNpmLauncher(npmArgs, config = {}, env = process.env, platform = process.platform) {
+  if (config.npmBin) {
+    return { command: config.npmBin, args: npmArgs, via: "configured" };
+  }
+
+  const execPath = env.npm_execpath;
+  if (execPath && execPath.toLowerCase().endsWith(".js")) {
+    return { command: process.execPath, args: [execPath, ...npmArgs], via: "npm_execpath" };
+  }
+
+  if (platform === "win32") {
+    const cli = findWindowsNpmCli(env);
+    if (cli) {
+      return { command: process.execPath, args: [cli, ...npmArgs], via: "resolved-cli" };
+    }
+    throw new Error(
+      "Could not locate npm's JavaScript entry point to run this package. " +
+        "Set NPX_VIBE_NPM_BIN to an npm executable, or run npx-vibe through npx so npm_execpath is set."
+    );
+  }
+
+  return { command: "npm", args: npmArgs, via: "path" };
+}
+
+function findWindowsNpmCli(env) {
+  const roots = [];
+  if (env.APPDATA) {
+    roots.push(join(env.APPDATA, "npm", "node_modules", "npm"));
+  }
+  roots.push(join(dirname(process.execPath), "node_modules", "npm"));
+
+  for (const root of roots) {
+    for (const relative of [["bin", "npm-cli.js"], ["lib", "cli.js"]]) {
+      const candidate = join(root, ...relative);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return null;
 }
 
 function safeFindBinCommand(manifest, spec, preferredBin) {
@@ -668,9 +730,7 @@ function sanitizeAiReview(aiReview) {
     provider: aiReview.provider,
     providerLabel: aiReview.providerLabel,
     model: aiReview.model,
-    modelProfile: aiReview.modelProfile,
     modelSource: aiReview.modelSource,
-    catalogVerifiedAt: aiReview.catalogVerifiedAt,
     reason: aiReview.reason,
     riskScore: aiReview.riskScore,
     confidence: aiReview.confidence,
@@ -719,8 +779,9 @@ function argvRequestsAgent(argv) {
     "--max-packages",
   ]);
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
+  const tokens = SUBCOMMANDS.has(argv[0]) ? argv.slice(1) : argv;
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
     if (token === "--") {
       return false;
     }
@@ -783,7 +844,7 @@ Examples:
   npx-vibe --provider gemini --api-key ... obscure-package
   OPENAI_API_KEY=... npx-vibe --ai online obscure-package
   ANTHROPIC_API_KEY=... npx-vibe --ai online obscure-package
-  npx-vibe --ai online --provider gemini --model-profile strong --api-key ... obscure-package
+  npx-vibe --ai online --provider gemini --model <id> --api-key ... obscure-package
   npx-vibe --ai online --provider custom --api-url https://models.example/v1/chat/completions --model my-model --api-key ... obscure-package
   npx-vibe --ai ollama --ollama-model qwen2.5-coder obscure-package
 
@@ -810,13 +871,13 @@ Options:
   --ci                       Emit GitHub Actions annotations and a job summary
   --concurrency <1-8>        Heuristic project-scan concurrency; default 3
   --ai-limit <0-100>         Maximum triggered AI reviews per project scan; default 3
-  --models                   Show bundled provider model recommendations
+  --models                   Show supported AI providers and where to find their
+                             current model lists
   --yes, -y                  Execute Caution verdicts without prompting
   --force                    Execute even when verdict is Block
   --ai off|auto|online|ollama  Default: off (heuristic-only)
   --provider auto|openai|anthropic|gemini|openrouter|groq|together|custom
-  --model-profile <profile>  fast, balanced (default), or strong
-  --model <name>             Exact online model; overrides the profile
+  --model <name>             Required for online AI review
   --api-url <url>            OpenAI-compatible chat completions endpoint
   --api-key <key>            API key; also enables online mode (provider recommended)
   --ollama-url <url>         Default: http://127.0.0.1:11434
@@ -840,9 +901,10 @@ Auto-detected keys (only after --ai online/auto opt-in):
   OPENROUTER_API_KEY, GROQ_API_KEY, TOGETHER_API_KEY, NPX_VIBE_API_KEY
 
 Model selection:
-  The balanced profile chooses a current provider-specific model.
-  Use --models to inspect the bundled mapping, --model-profile for a
-  simple quality/cost choice, or --model for an exact provider model.
+  npx-vibe ships no model catalog, so --model (or NPX_VIBE_MODEL) is required
+  for online review. A pinned id that a provider later retires would fail the
+  call and report a false Caution rather than a clear error. Run --models for
+  each provider's current model list.
 
 Provider routing:
   Provider-specific environment variables are preferred. Recognizable key

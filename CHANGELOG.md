@@ -2,6 +2,57 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 2.0.0 - 2026-09-01
+
+A security scanner should default to not running code, should score behaviour
+rather than novelty, and should not lose accuracy because a constant went stale.
+All three required breaking changes.
+
+### Breaking
+
+- **Scanning is the default; execution moved to `npx-vibe run`.** `npx-vibe <pkg>`
+  now reviews and exits. `npx-vibe run <pkg> -- args` scans and then executes,
+  and remains the only command that runs anything. `--yes`, `--force`,
+  `--allow-install-scripts`, and package arguments after `--` are rejected
+  outside `run`. `--check` is still accepted as a no-op so existing CI keeps
+  working.
+- **Project scans are transitive by default.** `--direct-only` restores the old
+  behaviour. Compromises reach victims through the tree, not the four names in
+  package.json. Without a lockfile the scan degrades to direct dependencies and
+  says so, instead of failing.
+- **Registry context no longer scores.** `young_package`, `young_version`,
+  `low_downloads`, and `downloads_unavailable` moved to a new `info` severity
+  that is reported and never scored. They fired on every healthy release --
+  vite, zod, svelte and turbo among them -- and trained people to ignore output.
+- **The bundled model catalog is gone.** `--model` (or `NPX_VIBE_MODEL`) is now
+  required for online AI review, and `--model-profile` is removed. A pinned id
+  that a provider retires turned into a 404, then `ai_unavailable`, then a
+  floored score, and finally a false Caution. `--models` now lists providers,
+  their key variables, and where each publishes its current model list.
+- **Agent `schemaVersion` is 2.** The `info` severity, the transitive default,
+  and the `script-approvals` kind all change how a payload must be read.
+- **MCP: `list_models` became `list_providers`**, `scan_project` takes
+  `directOnly` instead of `transitive`, and `modelProfile` is gone from every
+  tool schema.
+
+### Added
+
+- `npx-vibe approve-scripts` and the matching `approve_scripts` MCP tool: review
+  every dependency npm would let run an install script and return approve,
+  review, or deny with the source line behind it. `--write` records only the
+  unambiguous decisions in `allowScripts`; anything needing review is left for a
+  person. Reads package-lock.json, so it works on npm 10 and 11 as well as 12.
+- OSV.dev known-vulnerability lookup, batched across a whole tree, no API key.
+  An advisory tops out at high severity and never forces a Block on its own.
+  `--no-advisories` skips it.
+
+### Fixed
+
+- `npx-vibe run` works on Windows. Node refuses to spawn npm's `.cmd` shim
+  without a shell, so execution failed with `spawn EINVAL`. npm's JavaScript
+  entry point is now run directly with the current node binary, which needs no
+  shell and keeps arguments out of a command-line parser.
+
 ## 1.6.0 - 2026-08-31
 
 ### Fixed

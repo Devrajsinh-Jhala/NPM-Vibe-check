@@ -63,7 +63,8 @@ test("MCP tools are discoverable, read-only, and schema-backed", async () => {
   assert.deepEqual(response.result.tools.map((tool) => tool.name), [
     "scan_package",
     "scan_project",
-    "list_models",
+    "approve_scripts",
+    "list_providers",
   ]);
   for (const tool of response.result.tools) {
     assert.equal(tool.annotations.readOnlyHint, true);
@@ -273,3 +274,40 @@ async function waitFor(predicate) {
   }
   assert.ok(predicate(), "condition was not met before the timeout");
 }
+
+test("MCP approve_scripts returns the approval decision without executing anything", async () => {
+  let receivedConfig;
+  const server = new NpxVibeMcpServer({
+    version: "2.0.0",
+    env: {},
+    loadProjectManifest: (path, config) => {
+      receivedConfig = config;
+      return { manifestPath: `${path}/package.json`, manifest: { name: "app" }, lockfile: { packages: {} } };
+    },
+    reviewScriptApprovals: async () => ({
+      kind: "script-approvals",
+      verdict: { verdict: "caution", score: 40 },
+      project: { name: "app", version: "1.0.0", manifestPath: "/repo/package.json" },
+      summary: { withInstallScripts: 1, alreadyAllowed: 0, alreadyDenied: 0, reviewed: 1, errors: 0, approve: 0, review: 1, deny: 0 },
+      packages: [],
+      errors: [],
+    }),
+  });
+
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 41,
+    method: "tools/call",
+    params: { name: "approve_scripts", arguments: { path: "./app" } },
+  });
+
+  const payload = response.result.structuredContent;
+  assert.equal(response.result.isError, false);
+  assert.equal(payload.schemaVersion, 2);
+  assert.equal(payload.kind, "script-approvals");
+  assert.equal(payload.decision.action, "review");
+  assert.equal(payload.decision.exitCode, 2);
+  // AI stays off and credentials never arrive as tool arguments.
+  assert.equal(receivedConfig.aiMode, "off");
+  assert.equal(receivedConfig.command, "approve-scripts");
+});

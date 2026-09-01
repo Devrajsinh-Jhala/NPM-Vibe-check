@@ -55,7 +55,7 @@ test("dashboard uses singular file labels", () => {
   assert.match(dashboard, /Inspected: 1 selected file from 1 package file/);
 });
 
-test("dashboard identifies the resolved AI model profile", () => {
+test("dashboard names the AI provider and the exact model used", () => {
   const dashboard = renderDashboard({
     package: { name: "demo", version: "1.0.0" },
     profile: { npm: {}, maintainers: [], maintainersCount: 0 },
@@ -75,8 +75,7 @@ test("dashboard identifies the resolved AI model profile", () => {
       provider: "gemini",
       providerLabel: "Gemini",
       model: "gemini-3.5-flash",
-      modelProfile: "balanced",
-      modelSource: "profile:balanced",
+      modelSource: "explicit",
       confidence: "high",
       summary: "No suspicious behavior found.",
       findings: [],
@@ -91,7 +90,7 @@ test("dashboard identifies the resolved AI model profile", () => {
     },
   }, { color: false });
 
-  assert.match(dashboard, /Gemini gemini-3\.5-flash \[balanced\] \(high confidence\)/);
+  assert.match(dashboard, /Gemini gemini-3\.5-flash \(high confidence\)/);
   assert.match(dashboard, /Review memory: unchanged tarball/);
   assert.match(dashboard, /result was not saved \(read-only filesystem\)/);
   assert.match(dashboard, /AI evidence: 0 source-backed findings/);
@@ -155,7 +154,7 @@ test("agent package output exposes a versioned decision envelope", () => {
     findings: [],
   }, { kind: "package-scan", exitCode: 2, version: "1.4.0" }));
 
-  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.schemaVersion, 2);
   assert.equal(payload.tool.version, "1.4.0");
   assert.equal(payload.kind, "package-scan");
   assert.equal(payload.status, "complete");

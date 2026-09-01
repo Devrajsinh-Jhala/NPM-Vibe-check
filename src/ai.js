@@ -136,9 +136,7 @@ function onlineProviderMeta(provider) {
     provider: provider.name,
     providerLabel: provider.label,
     model: provider.model,
-    modelProfile: provider.modelProfile,
     modelSource: provider.modelSource,
-    catalogVerifiedAt: provider.catalogVerifiedAt,
   };
 }
 async function callOllama(snapshot, analysis, tarballInspection, config) {

@@ -156,7 +156,13 @@ export async function scanProject(input, options, reviewer) {
   }
 
   const project = loadProjectManifest(input, options);
-  if (options.transitive && !project.lockfile) {
+
+  // Transitive is the default in v2, so a project with no lockfile has to degrade
+  // to direct dependencies rather than fail. Only an explicit --transitive is
+  // treated as a hard requirement.
+  const transitive = Boolean(options.transitive) && Boolean(project.lockfile);
+  const transitiveFallback = Boolean(options.transitive) && !project.lockfile;
+  if (transitiveFallback && options.transitiveExplicit) {
     throw new Error(
       project.lockfileError
         ? `Transitive scanning needs a readable package-lock.json: ${project.lockfileError}`
@@ -164,7 +170,8 @@ export async function scanProject(input, options, reviewer) {
     );
   }
 
-  const discovered = collectProjectDependencies(project, options);
+  const scanOptions = { ...options, transitive };
+  const discovered = collectProjectDependencies(project, scanOptions);
   const maxPackages = Number(options.projectMaxPackages ?? 500);
   const allReviewable = discovered.filter((dependency) => dependency.packageSpec);
   const reviewable = allReviewable.slice(0, maxPackages);
@@ -179,7 +186,7 @@ export async function scanProject(input, options, reviewer) {
     })));
   const packages = new Array(reviewable.length);
   const errors = [];
-  const aiEnabled = options.aiMode && options.aiMode !== "off";
+  const aiEnabled = scanOptions.aiMode && scanOptions.aiMode !== "off";
   const aiLimit = Number(options.projectAiLimit ?? 3);
   let aiAttempts = 0;
   let aiSuppressed = 0;
@@ -193,7 +200,7 @@ export async function scanProject(input, options, reviewer) {
         reviewable.map((dependency) => ({ name: dependency.name, version: dependency.requested })),
         options
       ).catch(() => new Map());
-  const baseOptions = { ...options, downloadsCache, advisoriesCache };
+  const baseOptions = { ...scanOptions, downloadsCache, advisoriesCache };
 
   const reviewOne = async (dependency, index, reviewOptions = baseOptions) => {
     try {
@@ -259,7 +266,8 @@ export async function scanProject(input, options, reviewer) {
       lockfilePath: project.lockfilePath,
       lockfileError: project.lockfileError,
       includeDev: Boolean(options.includeDev),
-      transitive: Boolean(options.transitive),
+      transitive,
+      transitiveFallback,
     },
     verdict,
     summary: {

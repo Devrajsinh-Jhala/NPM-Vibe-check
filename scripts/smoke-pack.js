@@ -45,9 +45,9 @@ try {
   if (version !== packageJson.version) {
     throw new Error(`Packed CLI reported ${version}; expected ${packageJson.version}.`);
   }
-  const models = run(process.execPath, [cli, "--models"], consumer).stdout;
-  if (!models.includes("balanced (default)")) {
-    throw new Error("Packed CLI model catalog smoke test failed.");
+  const providers = run(process.execPath, [cli, "--models"], consumer).stdout;
+  if (!providers.includes("ANTHROPIC_API_KEY") || !providers.includes("No model catalog is bundled")) {
+    throw new Error("Packed CLI provider catalog smoke test failed.");
   }
   const mcpInput = [
     {
@@ -87,12 +87,13 @@ try {
     version: "0.0.0",
   }));
   const projectScan = run(process.execPath, [cli, "--project", emptyProject, "--no-history"], consumer).stdout;
-  if (!projectScan.includes("Scanned: 0/0 direct dependencies")) {
+  if (!projectScan.includes("Scanned: 0/0 direct dependencies")
+      || !projectScan.includes("No package-lock.json found")) {
     throw new Error("Packed CLI project-scan smoke test failed.");
   }
   const agentScan = run(process.execPath, [cli, "--agent", "--project", emptyProject], consumer);
   const agentPayload = JSON.parse(agentScan.stdout);
-  if (agentPayload.schemaVersion !== 1 || agentPayload.kind !== "project-scan") {
+  if (agentPayload.schemaVersion !== 2 || agentPayload.kind !== "project-scan") {
     throw new Error("Packed CLI agent-contract smoke test failed.");
   }
 

@@ -17,7 +17,7 @@ test("--agent emits structured JSON for input errors", () => {
   assert.equal(result.status, 1);
   assert.equal(result.stderr, "");
   const payload = JSON.parse(result.stdout);
-  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.schemaVersion, 2);
   assert.equal(payload.kind, "error");
   assert.equal(payload.decision.mustStop, true);
   assert.match(payload.error.message, /Missing package spec or --project/);
