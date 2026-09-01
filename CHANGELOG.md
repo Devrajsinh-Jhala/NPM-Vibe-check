@@ -2,6 +2,22 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 2.1.0 - 2026-09-02
+
+### Added
+
+- A GitHub Action, so a workflow needs one step instead of a hand-written npx
+  invocation. It runs `project`, `approve-scripts`, or `package`, exposes
+  `verdict` and `exit-code` outputs, and takes a `fail-on` policy of `block`
+  (default), `caution`, or `never`. An incomplete scan fails the step under every
+  policy, because a scan that could not finish is not a pass.
+- The action verifies which npx-vibe actually ran. npx prefers a locally
+  resolvable binary of the same name, so a project pinning npx-vibe as a
+  devDependency could silently run that version instead; a mismatch is now a
+  clear error rather than a confusing one.
+- `approve-scripts --ci` writes a job summary table to `GITHUB_STEP_SUMMARY`,
+  matching what project scans already did.
+
 ## 2.0.0 - 2026-09-01
 
 A security scanner should default to not running code, should score behaviour

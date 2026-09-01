@@ -1,0 +1,107 @@
+name: Action
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  action:
+    name: ${{ matrix.case.name }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        case:
+          - name: project scan
+            command: project
+            package: ""
+            expect: proceed
+          - name: approve-scripts
+            command: approve-scripts
+            package: ""
+            expect: proceed
+          - name: single package
+            command: package
+            package: is-number
+            expect: proceed
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Run the action
+        id: vibe
+        uses: ./
+        with:
+          command: ${{ matrix.case.command }}
+          package: ${{ matrix.case.package }}
+          # Never fail this job on a verdict; the assertion below is the test.
+          fail-on: never
+
+      - name: Assert the verdict
+        shell: bash
+        env:
+          ACTUAL: ${{ steps.vibe.outputs.verdict }}
+          EXPECTED: ${{ matrix.case.expect }}
+          EXIT_CODE: ${{ steps.vibe.outputs.exit-code }}
+        run: |
+          echo "verdict=$ACTUAL exit-code=$EXIT_CODE (expected $EXPECTED)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Expected verdict '$EXPECTED' but the action reported '$ACTUAL'."
+            exit 1
+          fi
+
+  fail-closed:
+    name: Blocked package fails the job
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # A package with a known-vulnerable version returns Caution, which must not
+      # fail a job under the default fail-on: block.
+      - name: Caution does not fail on the default policy
+        id: caution
+        uses: ./
+        with:
+          command: package
+          package: lodash@4.17.15
+
+      - name: Assert caution passed but was reported
+        shell: bash
+        env:
+          VERDICT: ${{ steps.caution.outputs.verdict }}
+        run: |
+          if [ "$VERDICT" != "caution" ]; then
+            echo "::error::Expected a caution verdict for a package with known advisories, got '$VERDICT'."
+            exit 1
+          fi
+
+      - name: Caution does fail when fail-on is caution
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          command: package
+          package: lodash@4.17.15
+          fail-on: caution
+
+      - name: Assert the strict policy failed the step
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.strict.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::fail-on: caution should have failed the step, but the outcome was '$OUTCOME'."
+            exit 1
+          fi

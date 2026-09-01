@@ -8,12 +8,12 @@
     "url": "https://github.com/Devrajsinh-Jhala/NPM-Vibe-check",
     "source": "github"
   },
-  "version": "2.0.0",
+  "version": "2.1.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "npx-vibe",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "packageArguments": [
         {
           "type": "positional",

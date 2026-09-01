@@ -1,0 +1,155 @@
+name: "npx-vibe"
+description: "Review npm dependencies and install-script permissions before they run, with source evidence for every decision."
+author: "Devrajsinh Jhala"
+
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  command:
+    description: >-
+      What to review. "project" scans the dependency tree from package.json and
+      package-lock.json. "approve-scripts" reviews which dependencies npm would
+      let run an install script. "package" reviews a single npm package spec.
+    required: false
+    default: "project"
+  package:
+    description: "Package spec to review. Required when command is 'package'."
+    required: false
+    default: ""
+  path:
+    description: "Project directory or package.json path."
+    required: false
+    default: "."
+  include-dev:
+    description: "Include devDependencies in a project scan."
+    required: false
+    default: "false"
+  direct-only:
+    description: "Scan only direct dependencies instead of the whole lockfile tree."
+    required: false
+    default: "false"
+  max-packages:
+    description: "Maximum packages reviewed in one project scan."
+    required: false
+    default: "500"
+  fail-on:
+    description: >-
+      When to fail the job: "block" fails only on a Block verdict, "caution"
+      fails on Caution or worse, "never" always succeeds and leaves the verdict
+      to the outputs. An incomplete scan always fails.
+    required: false
+    default: "block"
+  version:
+    description: "npx-vibe version range to run. Pin this for reproducible builds."
+    required: false
+    default: "2"
+
+outputs:
+  verdict:
+    description: "proceed, caution, block, or error."
+    value: ${{ steps.review.outputs.verdict }}
+  exit-code:
+    description: "0 proceed, 2 caution, 3 block, 1 incomplete."
+    value: ${{ steps.review.outputs.exit-code }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Review dependencies with npx-vibe
+      id: review
+      shell: bash
+      env:
+        VIBE_COMMAND: ${{ inputs.command }}
+        VIBE_PACKAGE: ${{ inputs.package }}
+        VIBE_PATH: ${{ inputs.path }}
+        VIBE_INCLUDE_DEV: ${{ inputs.include-dev }}
+        VIBE_DIRECT_ONLY: ${{ inputs.direct-only }}
+        VIBE_MAX_PACKAGES: ${{ inputs.max-packages }}
+        VIBE_FAIL_ON: ${{ inputs.fail-on }}
+        VIBE_VERSION: ${{ inputs.version }}
+      run: |
+        # GitHub runs composite bash steps with `-e`, which would abort the moment
+        # npx-vibe exits non-zero -- and a non-zero exit is the entire point here.
+        set -uo pipefail
+        set +e
+
+        args=()
+        case "$VIBE_COMMAND" in
+          project)
+            args+=(--project "$VIBE_PATH" --ci)
+            [ "$VIBE_INCLUDE_DEV" = "true" ] && args+=(--include-dev)
+            [ "$VIBE_DIRECT_ONLY" = "true" ] && args+=(--direct-only)
+            args+=(--max-packages "$VIBE_MAX_PACKAGES")
+            ;;
+          approve-scripts)
+            args=(approve-scripts --project "$VIBE_PATH" --ci)
+            ;;
+          package)
+            if [ -z "$VIBE_PACKAGE" ]; then
+              echo "::error::command 'package' requires the 'package' input."
+              exit 1
+            fi
+            args+=("$VIBE_PACKAGE")
+            ;;
+          *)
+            echo "::error::Unknown command '$VIBE_COMMAND'. Use project, approve-scripts, or package."
+            exit 1
+            ;;
+        esac
+
+        # npx prefers a locally resolvable binary of the same name, so a project
+        # that pins npx-vibe as a devDependency can silently run that version
+        # instead of the one requested here. Confirm what we actually got before
+        # trusting its verdict. This reuses the npx cache, so it is not a second
+        # download.
+        resolved="$(npx --yes "npx-vibe@${VIBE_VERSION}" --version 2>/dev/null | tail -1)"
+        echo "npx-vibe ${resolved:-unknown}"
+
+        if printf '%s' "$VIBE_VERSION" | grep -qE '^[0-9]+$'; then
+          if [ -n "$resolved" ] && [ "${resolved%%.*}" != "$VIBE_VERSION" ]; then
+            echo "::error::Asked for npx-vibe@${VIBE_VERSION} but ${resolved} ran instead. A locally installed npx-vibe is shadowing it; remove it or set the action's 'version' input to match."
+            exit 1
+          fi
+        fi
+
+        echo "Running: npx-vibe ${args[*]}"
+        npx --yes "npx-vibe@${VIBE_VERSION}" "${args[@]}"
+        code=$?
+
+        case "$code" in
+          0) verdict=proceed ;;
+          2) verdict=caution ;;
+          3) verdict=block ;;
+          *) verdict=error ;;
+        esac
+
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+
+        # An incomplete scan is never read as safe, whatever fail-on says.
+        if [ "$code" = "1" ]; then
+          echo "::error::npx-vibe could not complete the review. Not treating this as a pass."
+          exit 1
+        fi
+
+        case "$VIBE_FAIL_ON" in
+          never)
+            exit 0
+            ;;
+          caution)
+            [ "$code" = "0" ] && exit 0
+            echo "::error::npx-vibe returned $verdict and fail-on is set to caution."
+            exit 1
+            ;;
+          block)
+            [ "$code" = "3" ] || exit 0
+            echo "::error::npx-vibe returned Block. Review the annotations above."
+            exit 1
+            ;;
+          *)
+            echo "::error::Unknown fail-on value '$VIBE_FAIL_ON'. Use block, caution, or never."
+            exit 1
+            ;;
+        esac

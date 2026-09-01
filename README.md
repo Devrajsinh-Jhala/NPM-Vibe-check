@@ -511,6 +511,51 @@ npx --yes npx-vibe@latest --agent --project .
 
 Agent mode keeps stdout machine-readable for successful, incomplete, and failed scans. It is deliberately incompatible with `--force`, npx-vibe's `--yes`, `--allow-install-scripts`, and package execution arguments.
 
+### GitHub Action
+
+The published action wraps the same CLI, so a workflow needs one step:
+
+```yaml
+name: Dependency preflight
+
+on: [pull_request]
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
+```
+
+Review install-script permissions instead of the dependency tree, and fail the
+build when a lockfile change introduces one you have not decided on:
+
+```yaml
+      - uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
+        with:
+          command: approve-scripts
+          fail-on: caution
+```
+
+| Input | Default | Purpose |
+| --- | --- | --- |
+| `command` | `project` | `project`, `approve-scripts`, or `package` |
+| `package` | | Package spec, required when `command: package` |
+| `path` | `.` | Project directory or `package.json` path |
+| `include-dev` | `false` | Include devDependencies in a project scan |
+| `direct-only` | `false` | Skip the transitive tree |
+| `max-packages` | `500` | Cap on packages reviewed in one run |
+| `fail-on` | `block` | `block`, `caution`, or `never` |
+| `version` | `2` | npx-vibe version range to run |
+
+Outputs are `verdict` (`proceed`, `caution`, `block`, `error`) and `exit-code`.
+An incomplete scan always fails the step, even with `fail-on: never` &mdash; a scan
+that could not finish is never read as a pass.
+
 For GitHub Actions, `--ci` emits a warning for each Caution result, an error for each Block or operational failure, and writes a package table to the job summary:
 
 ```yaml

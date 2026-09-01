@@ -15,6 +15,7 @@ import {
   renderProjectDashboard,
   renderProjectMarkdownSummary,
   renderScriptApprovalAnnotations,
+  renderScriptApprovalMarkdown,
   renderScriptApprovals,
   toAgentError,
   toAgentResult,
@@ -171,6 +172,9 @@ async function runApproveScripts(config, env) {
 
   if (config.ci && env.GITHUB_ACTIONS === "true") {
     process.stdout.write(renderScriptApprovalAnnotations(report));
+    if (env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(env.GITHUB_STEP_SUMMARY, renderScriptApprovalMarkdown(report), "utf8");
+    }
   }
 
   return exitCode;

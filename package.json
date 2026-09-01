@@ -1,6 +1,6 @@
 {
   "name": "npx-vibe",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Evidence-first npm package and project dependency checks for developers, coding agents, and MCP clients before code executes.",
   "mcpName": "io.github.Devrajsinh-Jhala/npx-vibe",
   "type": "module",

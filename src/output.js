@@ -288,6 +288,56 @@ export function renderScriptApprovals(report, options = {}) {
   return `${lines.join("\n")}\n`;
 }
 
+export function renderScriptApprovalMarkdown(report) {
+  const summary = report.summary;
+  const title = report.errors.length
+    ? "Incomplete"
+    : summary.deny > 0
+      ? "Deny required"
+      : summary.review > 0
+        ? "Review required"
+        : "All settled";
+
+  const lines = [
+    `## npx-vibe approve-scripts: ${title}`,
+    "",
+    `**${summary.reviewed}** of **${summary.withInstallScripts}** dependencies with install scripts were reviewed. `
+      + `No install script was executed.`,
+    "",
+    `- Approve: **${summary.approve}**`,
+    `- Review: **${summary.review}**`,
+    `- Deny: **${summary.deny}**`,
+    `- Already allowed: **${summary.alreadyAllowed}**`,
+    "",
+  ];
+
+  if (report.packages.length) {
+    lines.push("| Package | Decision | Install script | Why |", "| --- | --- | --- | --- |");
+    const ordered = [...report.packages].sort((left, right) =>
+      APPROVAL_ORDER[left.decision] - APPROVAL_ORDER[right.decision] || left.name.localeCompare(right.name)
+    );
+    for (const entry of ordered) {
+      const script = entry.scripts[0] ? `${entry.scripts[0].name}: ${trim(entry.scripts[0].command, 70)}` : "implicit node-gyp";
+      lines.push(
+        `| ${markdownCell(`${entry.name}@${entry.version}`)} | ${entry.decision} | `
+          + `${markdownCell(script)} | ${markdownCell(trim(entry.reasons[0] ?? "", 120))} |`
+      );
+    }
+    lines.push("");
+  }
+
+  if (report.errors.length) {
+    lines.push("### Errors", "");
+    for (const error of report.errors.slice(0, 10)) {
+      lines.push(`- ${markdownCell(error.name)}: ${markdownCell(trim(error.message, 160))}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("_Packages needing review are never written to allowScripts automatically._", "");
+  return lines.join("\n");
+}
+
 export function renderScriptApprovalAnnotations(report) {
   const lines = [];
   for (const entry of report.packages) {
