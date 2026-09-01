@@ -99,23 +99,31 @@ runs:
             ;;
         esac
 
-        # npx prefers a locally resolvable binary of the same name, so a project
-        # that pins npx-vibe as a devDependency can silently run that version
-        # instead of the one requested here. Confirm what we actually got before
-        # trusting its verdict. This reuses the npx cache, so it is not a second
-        # download.
-        resolved="$(npx --yes "npx-vibe@${VIBE_VERSION}" --version 2>/dev/null | tail -1)"
-        echo "npx-vibe ${resolved:-unknown}"
+        # Install the exact requested version into a scratch directory and run it
+        # directly. `npx npx-vibe@2` resolves a locally installed binary of the
+        # same name first, so a project that pins npx-vibe as a devDependency --
+        # or this repository, which *is* npx-vibe -- would silently run something
+        # other than what was asked for. A security tool has to run the version
+        # you named.
+        tool_dir=".npx-vibe-runner"
+        rm -rf "$tool_dir"
+        trap 'rm -rf "$tool_dir"' EXIT
 
-        if printf '%s' "$VIBE_VERSION" | grep -qE '^[0-9]+$'; then
-          if [ -n "$resolved" ] && [ "${resolved%%.*}" != "$VIBE_VERSION" ]; then
-            echo "::error::Asked for npx-vibe@${VIBE_VERSION} but ${resolved} ran instead. A locally installed npx-vibe is shadowing it; remove it or set the action's 'version' input to match."
-            exit 1
-          fi
+        npm install --prefix "$tool_dir" --no-save --no-audit --no-fund           --ignore-scripts --loglevel=error "npx-vibe@${VIBE_VERSION}"
+        if [ $? -ne 0 ]; then
+          echo "::error::Could not install npx-vibe@${VIBE_VERSION} from the npm registry."
+          exit 1
         fi
 
+        cli="$tool_dir/node_modules/npx-vibe/bin/npx-vibe.js"
+        if [ ! -f "$cli" ]; then
+          echo "::error::npx-vibe@${VIBE_VERSION} installed but $cli is missing."
+          exit 1
+        fi
+
+        echo "npx-vibe $(node "$cli" --version)"
         echo "Running: npx-vibe ${args[*]}"
-        npx --yes "npx-vibe@${VIBE_VERSION}" "${args[@]}"
+        node "$cli" "${args[@]}"
         code=$?
 
         case "$code" in

@@ -2,6 +2,18 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 2.1.1 - 2026-09-02
+
+### Fixed
+
+- The GitHub Action now installs the exact requested version into a scratch
+  directory and invokes it directly, instead of going through `npx`. `npx
+  npx-vibe@2` resolves a locally installed binary of the same name first, so a
+  project that pins npx-vibe as a devDependency would silently run that version
+  instead of the one the workflow asked for. The 2.1.0 action failed outright
+  when run against this repository, which *is* npx-vibe -- caught by the
+  workflow that dogfoods it. A security tool has to run the version you named.
+
 ## 2.1.0 - 2026-09-02
 
 ### Added

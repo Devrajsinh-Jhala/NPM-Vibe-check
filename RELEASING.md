@@ -29,8 +29,8 @@ The workflow lives at `.github/workflows/release.yml` and requests only `content
 4. Create and push the matching tag:
 
    ```bash
-   git tag v2.1.0
-   git push origin v2.1.0
+   git tag v2.1.1
+   git push origin v2.1.1
    ```
 
 The release workflow verifies that the tag matches `package.json`, installs and tests the packed artifact, publishes with npm provenance, and creates a GitHub Release.
@@ -41,8 +41,8 @@ If trusted publishing is not configured, use the manual fallback after authentic
 npm login
 npm whoami
 npm publish --access public
-git tag v2.1.0
-git push origin v2.1.0
+git tag v2.1.1
+git push origin v2.1.1
 ```
 
 The tag workflow checks the registry first. When the matching version already exists, it skips the duplicate publish and creates only the GitHub Release.
