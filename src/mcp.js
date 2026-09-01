@@ -58,7 +58,7 @@ const AGENT_OUTPUT_SCHEMA = {
       },
       required: ["name", "version"],
     },
-    kind: { type: "string", enum: ["package-scan", "project-scan", "error"] },
+    kind: { type: "string", enum: ["package-scan", "project-scan", "script-approvals", "error"] },
     status: { type: "string", enum: ["complete", "incomplete", "error"] },
     decision: {
       type: "object",

@@ -13,12 +13,20 @@ import {
   renderGitHubActionsAnnotations,
   renderProjectDashboard,
   renderProjectMarkdownSummary,
+  renderScriptApprovalAnnotations,
+  renderScriptApprovals,
   toAgentError,
   toAgentResult,
   toJsonResult,
 } from "./output.js";
 import { formatProviderModelCatalog, modelProfiles } from "./providers.js";
-import { projectExitCode, scanProject } from "./project.js";
+import { loadProjectManifest, projectExitCode, scanProject } from "./project.js";
+import {
+  applyAllowScripts,
+  buildAllowScriptsPatch,
+  reviewScriptApprovals,
+  scriptApprovalExitCode,
+} from "./scripts.js";
 import {
   compareReviewMemory,
   createReviewFingerprint,
@@ -55,6 +63,10 @@ export async function main(argv = process.argv.slice(2)) {
 
 export async function run(argv, env = process.env) {
   const config = parseArgs(argv, env);
+
+  if (config.command === "approve-scripts" && !config.help && !config.version && !config.models) {
+    return runApproveScripts(config, env);
+  }
 
   if (config.help) {
     console.log(helpText());
@@ -127,6 +139,40 @@ export async function run(argv, env = process.env) {
   }
 
   return executePackage(snapshot, manifest, config.packageArgs, config);
+}
+
+async function runApproveScripts(config, env) {
+  const project = loadProjectManifest(config.projectPath, config);
+  const report = await reviewScriptApprovals(project, config, reviewPackage);
+  const exitCode = scriptApprovalExitCode(report);
+
+  if (config.write) {
+    report.write = applyAllowScripts(project.manifestPath, buildAllowScriptsPatch(report, config));
+  }
+
+  if (config.agent) {
+    console.log(toAgentResult(report, {
+      kind: "script-approvals",
+      exitCode,
+      version: packageVersion(),
+    }));
+    return exitCode;
+  }
+
+  if (config.json) {
+    console.log(toJsonResult(report));
+    return exitCode;
+  }
+
+  process.stdout.write(renderScriptApprovals(report, {
+    color: config.color && process.stdout.isTTY,
+  }));
+
+  if (config.ci && env.GITHUB_ACTIONS === "true") {
+    process.stdout.write(renderScriptApprovalAnnotations(report));
+  }
+
+  return exitCode;
 }
 
 export async function reviewPackage(packageSpecInput, config = {}) {
@@ -207,6 +253,11 @@ export async function reviewPackage(packageSpecInput, config = {}) {
 }
 
 export function parseArgs(argv, env = process.env) {
+  let command = "scan";
+  if (argv[0] === "approve-scripts") {
+    command = "approve-scripts";
+    argv = argv.slice(1);
+  }
   const aiModeExplicit = Boolean(env.NPX_VIBE_AI);
   const config = {
     aiMode: env.NPX_VIBE_AI ?? (env.NPX_VIBE_API_KEY ? "online" : "off"),
@@ -247,8 +298,12 @@ export function parseArgs(argv, env = process.env) {
     projectConcurrency: boundedIntegerFromEnv(env.NPX_VIBE_CONCURRENCY, 3, 1, 8),
     projectAiLimit: boundedIntegerFromEnv(env.NPX_VIBE_AI_LIMIT, 3, 0, 100),
     projectMaxPackages: boundedIntegerFromEnv(env.NPX_VIBE_MAX_PACKAGES, 500, 1, 5_000),
+    command,
     includeDev: false,
     transitive: false,
+    write: false,
+    pin: false,
+    all: false,
     ci: false,
     agent: false,
     check: false,
@@ -317,6 +372,15 @@ export function parseArgs(argv, env = process.env) {
           break;
         case "--transitive":
           config.transitive = true;
+          break;
+        case "--write":
+          config.write = true;
+          break;
+        case "--pin":
+          config.pin = true;
+          break;
+        case "--all":
+          config.all = true;
           break;
         case "--max-packages":
           config.projectMaxPackages = boundedIntegerFlag(parsed.name, readValue(), 1, 5_000);
@@ -428,8 +492,22 @@ export function parseArgs(argv, env = process.env) {
     }
   }
 
+  if (config.command === "approve-scripts") {
+    if (config.packageSpec) {
+      throw new Error("approve-scripts reviews a project, not a single package spec.");
+    }
+    config.projectPath = config.projectPath ?? ".";
+    config.check = true;
+  }
+
   if (!config.help && !config.version && !config.models && !config.packageSpec && !config.projectPath) {
     throw new Error("Missing package spec or --project <path>. Try --help.");
+  }
+
+  for (const [flag, enabled] of [["--write", config.write], ["--pin", config.pin], ["--all", config.all]]) {
+    if (enabled && config.command !== "approve-scripts") {
+      throw new Error(`${flag} is only available for the approve-scripts command.`);
+    }
   }
 
   if (config.projectPath && config.packageSpec) {
@@ -444,7 +522,7 @@ export function parseArgs(argv, env = process.env) {
     throw new Error("--transitive requires --project <path>.");
   }
 
-  if (config.ci && !config.projectPath) {
+  if (config.ci && !config.projectPath && config.command !== "approve-scripts") {
     throw new Error("--ci requires --project <path>.");
   }
 
@@ -680,6 +758,7 @@ function helpText() {
 Usage:
   npx-vibe [options] <package-spec> [-- package args]
   npx-vibe --project <directory|package.json> [options]
+  npx-vibe approve-scripts [--project <path>] [--write]
 
 Examples:
   npx-vibe cowsay -- hello
@@ -690,6 +769,9 @@ Examples:
   npx-vibe --project .
   npx-vibe --project . --include-dev --json
   npx-vibe --project . --transitive
+  npx-vibe approve-scripts
+  npx-vibe approve-scripts --write
+  npx-vibe approve-scripts --ci
   npx-vibe --agent --project .
   npx-vibe --mcp
   npx-vibe --project . --ci
@@ -700,6 +782,17 @@ Examples:
   npx-vibe --ai online --provider gemini --model-profile strong --api-key ... obscure-package
   npx-vibe --ai online --provider custom --api-url https://models.example/v1/chat/completions --model my-model --api-key ... obscure-package
   npx-vibe --ai ollama --ollama-model qwen2.5-coder obscure-package
+
+Commands:
+  approve-scripts            Review every dependency npm would let run an install
+                             script, and recommend approve, review, or deny with
+                             source evidence. Reads package-lock.json, so it works
+                             on npm 10 and 11 before you migrate to npm 12.
+    --write                  Record the unambiguous decisions in package.json
+                             allowScripts. Packages needing review are never
+                             written; a person decides those.
+    --pin                    Write name@version keys instead of bare names
+    --all                    Re-review packages already in allowScripts
 
 Options:
   --check                    Review only; do not execute

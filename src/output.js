@@ -110,8 +110,10 @@ export function toAgentResult(report, options = {}) {
   return JSON.stringify(createAgentResult(report, options), null, 2);
 }
 
+const AGENT_KINDS = new Set(["package-scan", "project-scan", "script-approvals"]);
+
 export function createAgentResult(report, options = {}) {
-  const kind = options.kind === "project-scan" ? "project-scan" : "package-scan";
+  const kind = AGENT_KINDS.has(options.kind) ? options.kind : "package-scan";
   const exitCode = Number(options.exitCode ?? 1);
   const incomplete = exitCode === 1;
   const verdict = report?.verdict?.verdict ?? null;
@@ -128,7 +130,7 @@ export function createAgentResult(report, options = {}) {
     kind,
     status: incomplete ? "incomplete" : "complete",
     decision: agentDecision(verdict, riskScore, exitCode, incomplete),
-    subject: kind === "project-scan"
+    subject: kind === "project-scan" || kind === "script-approvals"
       ? {
           type: "project",
           name: report?.project?.name ?? null,
@@ -187,6 +189,107 @@ function agentDecision(verdict, riskScore, exitCode, incomplete) {
     blocked: action === "stop",
     mustStop: action === "stop" || action === "retry",
   };
+}
+
+const APPROVAL_ORDER = { deny: 0, review: 1, approve: 2 };
+
+export function renderScriptApprovals(report, options = {}) {
+  const color = createColor(Boolean(options.color));
+  const summary = report.summary;
+  const incomplete = report.errors.length > 0;
+
+  const headline = incomplete
+    ? color.red("Incomplete")
+    : summary.deny > 0
+      ? color.red(`${summary.deny} to deny`)
+      : summary.review > 0
+        ? color.yellow(`${summary.review} need review`)
+        : color.green("All clear");
+  const symbol = incomplete || summary.deny > 0 ? SYMBOLS.block : summary.review > 0 ? SYMBOLS.caution : SYMBOLS.proceed;
+
+  const version = report.project.version ? `@${report.project.version}` : "";
+  const lines = [
+    `${symbol} npx-vibe approve-scripts: ${headline}`,
+    `${report.project.name ?? "project"}${version}`,
+    color.dim(report.project.manifestPath),
+    "",
+    `Dependencies with install scripts: ${summary.withInstallScripts}  ` +
+      `Already allowed: ${summary.alreadyAllowed}  Already denied: ${summary.alreadyDenied}`,
+    `Reviewed now: ${summary.reviewed}  ` +
+      `${color.green(`approve ${summary.approve}`)}  ${color.yellow(`review ${summary.review}`)}  ${color.red(`deny ${summary.deny}`)}`,
+  ];
+
+  const packages = [...report.packages].sort((left, right) =>
+    APPROVAL_ORDER[left.decision] - APPROVAL_ORDER[right.decision] || left.name.localeCompare(right.name)
+  );
+
+  if (packages.length) {
+    lines.push("");
+    for (const entry of packages) {
+      const label = entry.decision.toUpperCase().padEnd(8);
+      const styled = entry.decision === "deny"
+        ? color.red(label)
+        : entry.decision === "review"
+          ? color.yellow(label)
+          : color.green(label);
+      lines.push(`${styled} ${entry.name}@${entry.version}${entry.dev ? color.dim(" (dev)") : ""}`);
+      for (const script of entry.scripts.slice(0, 3)) {
+        lines.push(color.dim(`  ${script.name}: ${trim(script.command, 150)}`));
+      }
+      if (entry.hosts.length) {
+        lines.push(`  Reaches: ${entry.hosts.join(", ")}`);
+      }
+      for (const reason of entry.reasons.slice(0, 2)) {
+        lines.push(`  ${trim(reason, 170)}`);
+      }
+      for (const item of entry.evidence.slice(0, 2)) {
+        const where = item.file ? `${item.file}${item.line ? `:${item.line}` : ""}` : "";
+        lines.push(color.dim(`  Evidence ${where}: ${trim(item.excerpt, 150)}`));
+      }
+      lines.push("");
+    }
+  } else {
+    lines.push("", "No dependency is waiting for an install-script decision.", "");
+  }
+
+  if (report.errors.length) {
+    lines.push("Errors:");
+    for (const error of report.errors.slice(0, 10)) {
+      lines.push(color.red(`- ${error.name}@${error.version}: ${trim(error.message, 180)}`));
+    }
+    lines.push("");
+  }
+
+  lines.push(color.dim("No install script was executed during this review."));
+  if (report.write?.written) {
+    lines.push(color.green(`Recorded ${report.write.count} decision(s) in allowScripts.`));
+  } else if (summary.approve + summary.deny > 0) {
+    lines.push(`Run again with --write to record ${summary.approve + summary.deny} unambiguous decision(s) in package.json.`);
+  }
+  if (summary.review > 0) {
+    lines.push(color.yellow(`${summary.review} package(s) need a human decision; --write never records those.`));
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function renderScriptApprovalAnnotations(report) {
+  const lines = [];
+  for (const entry of report.packages) {
+    if (entry.decision === "approve") {
+      continue;
+    }
+    const level = entry.decision === "deny" ? "error" : "warning";
+    const title = escapeWorkflowProperty(`npx-vibe approve-scripts: ${entry.name}`);
+    const message = escapeWorkflowMessage(
+      `${entry.decision} ${entry.name}@${entry.version}: ${entry.reasons[0] ?? "install script needs review"}`
+    );
+    lines.push(`::${level} title=${title}::${message}`);
+  }
+  for (const error of report.errors) {
+    lines.push(`::error title=${escapeWorkflowProperty(`npx-vibe: ${error.name}`)}::${escapeWorkflowMessage(error.message)}`);
+  }
+  return lines.length ? `${lines.join("\n")}\n` : "";
 }
 
 export function renderProjectDashboard(scan, options = {}) {
