@@ -37,8 +37,8 @@
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap"
     />
     <script>document.documentElement.classList.add("js");</script>
-    <link rel="stylesheet" href="./landing.css?v=200" />
-    <script src="./app.js?v=200" defer></script>
+    <link rel="stylesheet" href="./landing.css?v=211" />
+    <script src="./app.js?v=211" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -260,16 +260,26 @@ npx npx-vibe run esbuild -- --version</code></pre>
             </article>
 
             <article class="card">
+              <h3>Any other CI</h3>
+              <p>Exit 0 proceed, 2 review, 3 block. Nothing GitHub-specific is required.</p>
+              <pre class="snippet"><code>npx npx-vibe --project . --json
+npx npx-vibe approve-scripts</code></pre>
+            </article>
+
+            <article class="card">
               <h3>Coding agents</h3>
               <p>Versioned, fail-closed JSON. An agent continues only on <code>action: "continue"</code>.</p>
               <pre class="snippet"><code>npx --yes npx-vibe@latest --agent &lt;package&gt;</code></pre>
             </article>
 
             <article class="card">
-              <h3>CI</h3>
-              <p>Exit 2 for review, 3 for block. Annotations and a job summary on GitHub Actions.</p>
-              <pre class="snippet"><code>npx npx-vibe --project . --ci
-npx npx-vibe approve-scripts --ci</code></pre>
+              <h3>GitHub Action</h3>
+              <p>One step. Annotations and a job summary, with a <code>fail-on</code> policy you choose.</p>
+              <pre class="snippet"><code>- uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
+  with:
+    command: approve-scripts
+    fail-on: caution</code></pre>
+              <p class="card-note"><a href="https://github.com/marketplace/actions/npx-vibe">On the GitHub Marketplace</a></p>
             </article>
           </div>
         </div>

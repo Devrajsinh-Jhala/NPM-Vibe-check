@@ -513,7 +513,7 @@ Agent mode keeps stdout machine-readable for successful, incomplete, and failed 
 
 ### GitHub Action
 
-The published action wraps the same CLI, so a workflow needs one step:
+[Listed on the GitHub Marketplace](https://github.com/marketplace/actions/npx-vibe). The action wraps the same CLI, so a workflow needs one step:
 
 ```yaml
 name: Dependency preflight

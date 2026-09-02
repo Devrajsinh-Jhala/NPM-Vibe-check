@@ -197,12 +197,28 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
   });
 });
 
-const DOWNLOAD_API = "https://api.npmjs.org/downloads/range/last-week/npx-vibe";
+// The named windows (last-week, last-month) lag several days behind, so the
+// counter read as stale even though it was live. An explicit date range returns
+// the recent days, and we sum the most recent seven that actually have data.
+const DOWNLOAD_RANGE_DAYS = 14;
+
+function downloadsUrl() {
+  const day = 86400000;
+  const iso = (date) => date.toISOString().slice(0, 10);
+  const end = new Date(Date.now());
+  const start = new Date(end.getTime() - DOWNLOAD_RANGE_DAYS * day);
+  return `https://api.npmjs.org/downloads/range/${iso(start)}:${iso(end)}/npx-vibe`;
+}
 const numberFormatter = new Intl.NumberFormat("en-US");
 
 function animateNumber(element, total) {
-  if (reduceMotion) {
-    element.textContent = numberFormatter.format(total);
+  const finalText = numberFormatter.format(total);
+
+  // requestAnimationFrame is paused in a hidden or background tab, so animating
+  // there leaves the placeholder on screen forever. The number matters; the
+  // count-up does not.
+  if (reduceMotion || document.hidden || typeof requestAnimationFrame !== "function") {
+    element.textContent = finalText;
     return;
   }
 
@@ -210,12 +226,20 @@ function animateNumber(element, total) {
   const startedAt = performance.now();
   const step = (now) => {
     const progress = Math.min(1, (now - startedAt) / duration);
+    if (progress >= 1) {
+      element.textContent = finalText;
+      return;
+    }
     const eased = 1 - (1 - progress) ** 3;
     element.textContent = numberFormatter.format(Math.round(total * eased));
-    if (progress < 1) requestAnimationFrame(step);
+    requestAnimationFrame(step);
   };
 
   requestAnimationFrame(step);
+  // Backstop for a tab hidden mid-animation, which pauses the frames.
+  setTimeout(() => {
+    element.textContent = finalText;
+  }, duration + 300);
 }
 
 async function refreshDownloads() {
@@ -223,7 +247,7 @@ async function refreshDownloads() {
   const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
-    const response = await fetch(DOWNLOAD_API, {
+    const response = await fetch(downloadsUrl(), {
       headers: { accept: "application/json" },
       signal: controller.signal,
     });
@@ -231,17 +255,22 @@ async function refreshDownloads() {
     if (!response.ok) throw new Error(`npm API returned ${response.status}`);
 
     const payload = await response.json();
-    const total = Array.isArray(payload.downloads)
-      ? payload.downloads.reduce((sum, day) => sum + Number(day.downloads || 0), 0)
-      : 0;
+    const days = Array.isArray(payload.downloads) ? payload.downloads : [];
+    // Trailing zero days are usually "not counted yet" rather than a real zero.
+    const counted = [...days];
+    while (counted.length && Number(counted[counted.length - 1].downloads || 0) === 0) {
+      counted.pop();
+    }
 
+    const week = counted.slice(-7);
+    const total = week.reduce((sum, day) => sum + Number(day.downloads || 0), 0);
     if (!total) return;
 
     document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
       animateNumber(element, total);
       element.setAttribute(
         "title",
-        `${numberFormatter.format(total)} downloads from ${payload.start} through ${payload.end}`
+        `${numberFormatter.format(total)} downloads from ${week[0].day} through ${week[week.length - 1].day}`
       );
     });
   } catch (error) {
