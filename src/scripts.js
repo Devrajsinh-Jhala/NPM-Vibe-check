@@ -192,8 +192,22 @@ export function classifyInstallScripts(result) {
     return { decision: "approve", reasons, hosts: [], scripts, evidence: [] };
   }
 
-  reasons.push("Install scripts run commands that no automatic rule recognises.");
-  return { decision: "review", reasons, hosts: networkHosts(result), scripts, evidence: [] };
+  // "Unrecognised" is not the same as "suspicious", and saying which one it is
+  // decides whether a person needs to open the tarball.
+  const hosts = networkHosts(result);
+  // Every package here has an install script by definition, and registry context
+  // is not behaviour, so neither counts as "something was found".
+  const behavioural = findings.filter((finding) =>
+    finding.severity !== "info"
+    && !["lifecycle_hook", "publish_lifecycle_hook", "known_vulnerability"].includes(finding.code)
+  );
+  reasons.push(
+    behavioural.length === 0 && hosts.length === 0
+      ? "Nothing matched: no network, shell, credential, or write-outside-package pattern "
+        + "was found in the install script or the files it reaches. Unrecognised, not suspicious."
+      : "Install scripts run commands that no automatic rule recognises."
+  );
+  return { decision: "review", reasons, hosts, scripts, evidence: [] };
 }
 
 export function commandSegments(command) {
