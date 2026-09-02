@@ -242,41 +242,56 @@ function animateNumber(element, total) {
   }, duration + 300);
 }
 
-async function refreshDownloads() {
+async function fetchJson(url, timeoutMs) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(downloadsUrl(), {
+    const response = await fetch(url, {
       headers: { accept: "application/json" },
       signal: controller.signal,
     });
-
     if (!response.ok) throw new Error(`npm API returned ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
-    const payload = await response.json();
+function applyTotal(total, from, to) {
+  if (!total) return false;
+  document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
+    animateNumber(element, total);
+    element.setAttribute(
+      "title",
+      `${numberFormatter.format(total)} downloads from ${from} through ${to}`
+    );
+  });
+  return true;
+}
+
+async function refreshDownloads() {
+  // Preferred: an explicit range, because npm's named windows lag several days.
+  try {
+    const payload = await fetchJson(downloadsUrl(), 12000);
     const days = Array.isArray(payload.downloads) ? payload.downloads : [];
-    // Trailing zero days are usually "not counted yet" rather than a real zero.
     const counted = [...days];
+    // Trailing zero days are "not counted yet" rather than a real zero.
     while (counted.length && Number(counted[counted.length - 1].downloads || 0) === 0) {
       counted.pop();
     }
-
     const week = counted.slice(-7);
     const total = week.reduce((sum, day) => sum + Number(day.downloads || 0), 0);
-    if (!total) return;
+    if (applyTotal(total, week[0]?.day, week[week.length - 1]?.day)) return;
+  } catch (error) {
+    console.warn("Range download lookup failed, falling back:", error.message);
+  }
 
-    document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
-      animateNumber(element, total);
-      element.setAttribute(
-        "title",
-        `${numberFormatter.format(total)} downloads from ${week[0].day} through ${week[week.length - 1].day}`
-      );
-    });
+  // Fallback: the named window. Older data, but better than a placeholder.
+  try {
+    const payload = await fetchJson("https://api.npmjs.org/downloads/point/last-week/npx-vibe", 8000);
+    applyTotal(Number(payload.downloads || 0), payload.start, payload.end);
   } catch (error) {
     console.warn("Could not refresh npm download count:", error.message);
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
