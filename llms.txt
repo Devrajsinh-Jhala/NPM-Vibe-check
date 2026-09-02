@@ -26,6 +26,18 @@ Decide which dependencies may run install scripts under npm 12:
 
     npx --yes npx-vibe@latest --agent approve-scripts
 
+## GitHub Action
+
+Listed at https://github.com/marketplace/actions/npx-vibe
+
+    - uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
+      with:
+        command: approve-scripts   # or project, or package
+        fail-on: caution           # block (default), caution, never
+
+Outputs are verdict (proceed, caution, block, error) and exit-code. An
+incomplete scan fails the step under every fail-on policy.
+
 Install the portable Agent Skill:
 
     npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g
