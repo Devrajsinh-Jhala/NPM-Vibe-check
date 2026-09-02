@@ -37,6 +37,14 @@ jobs:
         with:
           node-version: 24
 
+      # approve-scripts reads package-lock.json, and this repository does not
+      # check one in. npx-vibe has no dependencies, so the generated lockfile has
+      # nothing requesting an install script -- which is the case under test.
+      - name: Generate a lockfile for the approve-scripts case
+        if: matrix.case.command == 'approve-scripts'
+        shell: bash
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
       - name: Run the action
         id: vibe
         uses: ./
