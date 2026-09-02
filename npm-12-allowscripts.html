@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>npm 12 allowScripts: how to decide what to approve</title>
+    <meta
+      name="description"
+      content="npm 12 turned install scripts off by default. Every guide tells you to review them carefully. This one tells you how: the three questions that matter, what the common packages actually do, and one command that answers them."
+    />
+    <meta property="og:title" content="npm 12 allowScripts: how to decide what to approve" />
+    <meta
+      property="og:description"
+      content="The list of pending install scripts is the easy part. Deciding is the hard part. Here is how to triage allowScripts without reading eight tarballs by hand."
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://devrajsinh-jhala.github.io/NPM-Vibe-check/npm-12-allowscripts.html" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#F7F5F1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0D1013" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://devrajsinh-jhala.github.io/NPM-Vibe-check/npm-12-allowscripts.html" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap"
+    />
+    <link rel="stylesheet" href="./landing.css?v=212" />
+    <style>
+      .guide { padding: 56px 0 96px; }
+      .guide-head { max-width: 34ch; }
+      .guide h1 {
+        font-size: clamp(2.1rem, 4.4vw, 3.1rem); line-height: 1.06; margin: 0 0 18px;
+      }
+      .guide-meta {
+        font-family: "JetBrains Mono", monospace; font-size: 12.5px; color: var(--muted);
+        margin: 0 0 34px; display: flex; flex-wrap: wrap; gap: 6px 20px;
+      }
+      .prose { max-width: 68ch; }
+      .prose h2 {
+        font-family: Archivo, sans-serif; font-size: 1.5rem; font-weight: 700;
+        letter-spacing: -.022em; margin: 52px 0 14px; text-wrap: balance;
+      }
+      .prose h3 {
+        font-family: Archivo, sans-serif; font-size: 1.08rem; font-weight: 600;
+        margin: 30px 0 8px;
+      }
+      .prose p { margin: 0 0 16px; color: var(--ink-2); }
+      .prose p strong, .prose li strong { color: var(--ink); font-weight: 600; }
+      .prose ul, .prose ol { margin: 0 0 16px; padding-left: 22px; color: var(--ink-2); }
+      .prose li { margin-bottom: 8px; }
+      .prose .snippet { max-width: 100%; }
+      .note {
+        border-left: 3px solid var(--accent); background: var(--paper);
+        padding: 18px 22px; border-radius: 0 8px 8px 0; margin: 24px 0;
+      }
+      .note p:last-child { margin-bottom: 0; }
+      .note strong { color: var(--ink); }
+      .note.warn { border-left-color: var(--warn); }
+      .toc {
+        background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+        padding: 20px 24px; margin: 0 0 40px; max-width: 68ch;
+      }
+      .toc p {
+        font-family: Archivo, sans-serif; font-size: 11.5px; letter-spacing: .12em;
+        text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600;
+      }
+      .toc ol { margin: 0; padding-left: 20px; color: var(--ink-2); font-size: 15px; }
+      .toc li { margin-bottom: 5px; }
+      .wide { max-width: 900px; }
+      td .verdict { margin-right: 0; }
+      .cta-band {
+        background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+        padding: 34px 30px; margin: 52px 0 0; max-width: 68ch;
+      }
+      .cta-band h2 { margin-top: 0; }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <nav class="container nav" aria-label="Primary">
+        <a class="brand" href="./">
+          <span class="brand-mark" aria-hidden="true">nv</span>
+          <span class="brand-name">npx-vibe</span>
+          <small>2.1.2</small>
+        </a>
+        <div class="nav-links">
+          <a href="./#npm12">npm 12</a>
+          <a href="./#how">How it works</a>
+          <a href="./#surfaces">Integrations</a>
+        </div>
+        <div class="nav-actions">
+          <a class="nav-link" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
+          <a class="btn btn-primary btn-sm" href="https://www.npmjs.com/package/npx-vibe">View on npm</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main" class="container guide">
+      <div class="guide-head">
+        <p class="eyebrow">npm 12 migration</p>
+        <h1>npm 12 turned off install scripts. Deciding what to turn back on is the hard part.</h1>
+      </div>
+      <p class="guide-meta">
+        <span>Updated 2 September 2026</span>
+        <span>npm 12.0.0 shipped 8 July 2026</span>
+        <span>~10 minute read</span>
+      </p>
+
+      <div class="toc">
+        <p>What this covers</p>
+        <ol>
+          <li><a href="#what-changed">What actually changed, and how it breaks</a></li>
+          <li><a href="#the-list">Getting the list of pending scripts</a></li>
+          <li><a href="#the-lie">The setting that makes the list lie to you</a></li>
+          <li><a href="#three-questions">The only three questions that matter</a></li>
+          <li><a href="#real-packages">What the common packages actually do</a></li>
+          <li><a href="#one-command">Answering all of it in one command</a></li>
+          <li><a href="#allowlist">Writing the allowlist: names or pinned versions</a></li>
+          <li><a href="#ci">Enforcing it in CI</a></li>
+          <li><a href="#limits">What none of this tells you</a></li>
+        </ol>
+      </div>
+
+      <div class="prose">
+        <h2 id="what-changed">What actually changed</h2>
+        <p>
+          npm 12.0.0 shipped on 8 July 2026 and made install-time code execution opt-in.
+          <code>preinstall</code>, <code>install</code> and <code>postinstall</code> from your
+          dependencies no longer run unless the project explicitly allows them &mdash; and that
+          includes the implicit <code>node-gyp rebuild</code> npm performs for any package with a
+          <code>binding.gyp</code>. Git and remote-URL dependencies became opt-in in the same
+          release, behind <code>--allow-git</code> and <code>--allow-remote</code>.
+        </p>
+        <p>
+          The part that catches teams out is <strong>how quietly it fails</strong>. An unapproved
+          script is skipped, npm prints a warning, and the install <em>succeeds</em>. Your CI goes
+          green. What breaks is whatever depended on the script having run: a native addon that
+          never compiled, a browser binary that was never downloaded. That surfaces later, at
+          runtime, in a request &mdash; usually as <code>cannot find module ...node</code>.
+        </p>
+
+        <div class="note warn">
+          <p>
+            <strong>A green build is not evidence that this went well.</strong> Read the install
+            warnings, or turn them into errors with <code>strict-allow-scripts</code> in CI, which
+            is covered below.
+          </p>
+        </div>
+
+        <h2 id="the-list">Step 1: get the list</h2>
+        <p>
+          Install your dependencies first, so npm can see which of them declare scripts, then ask
+          for the pending ones. This is read-only and changes nothing:
+        </p>
+        <pre class="snippet"><code>npm install
+npm approve-scripts --allow-scripts-pending</code></pre>
+        <p>
+          You get back the packages waiting on a decision and the command each one would run. On a
+          typical application that is somewhere between three and a dozen entries, and it is the
+          easy half of the job.
+        </p>
+
+        <h2 id="the-lie">Step 2: check the setting that makes the list lie</h2>
+        <p>
+          If your project or CI sets <code>ignore-scripts=true</code> in <code>.npmrc</code> &mdash;
+          a very common hardening step from before npm 12 &mdash; it
+          <strong>silently bypasses the entire allowScripts system</strong>. Nothing runs even when
+          <code>allowScripts</code> is correctly filled in, and
+          <code>--allow-scripts-pending</code> reports nothing pending, because from npm's point of
+          view nothing is.
+        </p>
+        <pre class="snippet"><code>grep -r "ignore-scripts" .npmrc ~/.npmrc 2>/dev/null</code></pre>
+        <p>
+          If you find it, decide deliberately: keep <code>ignore-scripts=true</code> and accept that
+          no native module will ever build, or remove it and let <code>allowScripts</code> do the
+          job it was designed for. What you should not do is leave it in place and believe your
+          allowlist is being enforced.
+        </p>
+
+        <h2 id="three-questions">Step 3: the only three questions that matter</h2>
+        <p>
+          Every other guide stops at "review them carefully." Here is what reviewing carefully
+          actually means. For each pending package, an install script is worth worrying about if it
+          does any of three things:
+        </p>
+        <ol>
+          <li><strong>Reaches the network.</strong> Downloading a prebuilt binary is normal and also
+            exactly what an attacker does. The question is not <em>whether</em> but <em>from
+            where</em>: the vendor's own release host, or somewhere you have never heard of.</li>
+          <li><strong>Reads environment variables or credentials.</strong> There is no legitimate
+            reason for an install script to read <code>process.env</code> wholesale, or to touch
+            <code>~/.npmrc</code>, <code>~/.ssh</code>, or cloud credential files. In CI those
+            variables are your deploy keys.</li>
+          <li><strong>Writes outside its own directory.</strong> A build step writes into the
+            package. Writing to your home directory, a shell profile, or
+            <code>authorized_keys</code> is persistence, not installation.</li>
+        </ol>
+        <p>
+          Everything else &mdash; compiling C++, checking whether a prebuilt binary already exists,
+          printing a funding notice &mdash; is noise. If a script does none of the three, it does
+          not deserve more of your attention than the thirty seconds it takes to confirm that.
+        </p>
+
+        <h2 id="real-packages">What the common packages actually do</h2>
+        <p>
+          These are the eight packages most likely to appear in your pending list, reviewed at the
+          versions current on 2 September 2026. No install script was executed to produce this
+          table; each package's tarball was downloaded, verified against the registry's integrity
+          hash, and read.
+        </p>
+
+        <div class="table-wrap wide">
+          <table>
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Install script</th>
+                <th>Verdict</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>bufferutil</code></td>
+                <td class="mono">node-gyp-build</td>
+                <td><span class="verdict verdict-ok">approve</span></td>
+                <td>Local compile only. Nothing to decide.</td>
+              </tr>
+              <tr>
+                <td><code>utf-8-validate</code></td>
+                <td class="mono">node-gyp-build</td>
+                <td><span class="verdict verdict-ok">approve</span></td>
+                <td>Local compile only. Nothing to decide.</td>
+              </tr>
+              <tr>
+                <td><code>esbuild</code></td>
+                <td class="mono">node install.js</td>
+                <td><span class="verdict verdict-warn">review</span></td>
+                <td>Fetches over HTTPS <em>and</em> shells out to <code>npm install</code>. The one
+                  package here where the evidence is unambiguous &mdash; see below.</td>
+              </tr>
+              <tr>
+                <td><code>better-sqlite3</code></td>
+                <td class="mono">prebuild-install || node-gyp rebuild</td>
+                <td><span class="verdict verdict-warn">review</span></td>
+                <td>Reads like a compile, but the first branch downloads a prebuilt binary.</td>
+              </tr>
+              <tr>
+                <td><code>bcrypt</code></td>
+                <td class="mono">node-pre-gyp install --fallback-to-build</td>
+                <td><span class="verdict verdict-warn">review</span></td>
+                <td>Same shape: download first, compile only as a fallback.</td>
+              </tr>
+              <tr>
+                <td><code>sharp</code></td>
+                <td class="mono">node install/check.js || npm run build</td>
+                <td><span class="verdict verdict-warn">review</span></td>
+                <td>Checks for an existing binary, then builds. No suspicious pattern in its own code.</td>
+              </tr>
+              <tr>
+                <td><code>puppeteer</code></td>
+                <td class="mono">node install.mjs</td>
+                <td><span class="verdict verdict-warn">review</span></td>
+                <td>Downloads a browser, but through a dependency &mdash; nothing matches in
+                  puppeteer's own tarball. See the limits section.</td>
+              </tr>
+              <tr>
+                <td><code>@swc/core</code></td>
+                <td class="mono">node postinstall.js</td>
+                <td><span class="verdict verdict-warn">review</span></td>
+                <td>Nothing matched. Unrecognised rather than suspicious.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Two of eight are decidable automatically. That is the honest number, and it is the reason
+          "just review them" is unhelpful advice: <strong>most real packages land in the middle</strong>,
+          and what you need is not a verdict but the specific thing the script does, so that a
+          thirty-second judgement replaces an hour of tarball archaeology.
+        </p>
+        <p>Here is what that looks like for the one case with hard evidence:</p>
+        <pre class="snippet"><code>REVIEW   esbuild@0.28.2
+  postinstall: node install.js
+  network_and_shell: Code combines network access with shell execution.
+  Evidence install.js:147: function fetch(url) {
+    ... https.get(url, (res) =&gt; {
+  Evidence install.js:187: child_process.execSync(
+    `npm install --loglevel=error ... ${pkg}@${packageJSON.version}`)</code></pre>
+        <p>
+          Now the decision is easy and it is yours: esbuild downloads its platform binary and
+          shells out to npm to install it. That is documented, expected behaviour for esbuild, and
+          you can approve it knowing exactly what you approved.
+        </p>
+
+        <h2 id="one-command">Answering all of it in one command</h2>
+        <p>
+          Reading eight tarballs by hand is the reason people rubber-stamp allowlists. This does the
+          reading:
+        </p>
+        <pre class="snippet"><code>npx npx-vibe approve-scripts</code></pre>
+        <p>
+          It reads <code>package-lock.json</code> for every dependency npm would let run an install
+          script, downloads and integrity-checks each tarball, reads the script and the files it
+          reaches, and returns <strong>approve</strong>, <strong>review</strong>, or
+          <strong>deny</strong> with the source line behind each one. Nothing is executed.
+        </p>
+        <p>
+          It reads the lockfile directly rather than shelling out to npm, so it works on npm 10 and
+          11 as well as 12 &mdash; you can settle the list <em>before</em> you upgrade, instead of
+          after your CI starts warning.
+        </p>
+
+        <h2 id="allowlist">Step 4: write the allowlist</h2>
+        <p>
+          npm records the decision in <code>package.json</code> as an object keyed by package name
+          or by exact <code>name@version</code>:
+        </p>
+        <pre class="snippet"><code>{
+  "allowScripts": {
+    "bufferutil": true,
+    "utf-8-validate": true,
+    "esbuild": true,
+    "some-package": false
+  }
+}</code></pre>
+        <p>
+          <strong>Prefer bare names.</strong> A pinned <code>sharp@0.34.5</code> entry stops
+          applying the moment you bump the dependency, and you will be re-approving on every
+          upgrade. Pin only where you genuinely want a fresh decision each time.
+        </p>
+        <p>To have the unambiguous decisions written for you:</p>
+        <pre class="snippet"><code>npx npx-vibe approve-scripts --write</code></pre>
+        <p>
+          This writes only the packages it could decide: <code>true</code> for approve,
+          <code>false</code> for deny. <strong>Anything needing review is deliberately left
+          out.</strong> Auto-approving the ambiguous middle would recreate exactly the rubber stamp
+          the allowlist exists to replace. Commit the result so your machine and your CI agree.
+        </p>
+
+        <h2 id="ci">Step 5: enforce it in CI</h2>
+        <p>
+          On a developer machine a skipped script is a warning. In CI it should be a failure, or you
+          will ship an application whose native modules never built:
+        </p>
+        <pre class="snippet"><code>npm ci --strict-allow-scripts</code></pre>
+        <p>
+          Do not turn that on locally. A newly added dependency with an install script would fail
+          your install before you have had the chance to review it.
+        </p>
+        <p>
+          To catch an unreviewed script at the point it enters the lockfile &mdash; in the pull
+          request, rather than in a deploy &mdash; add the review to your workflow:
+        </p>
+        <pre class="snippet"><code>- uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
+  with:
+    command: approve-scripts
+    fail-on: caution</code></pre>
+        <p>
+          With <code>fail-on: caution</code> the job fails when any dependency requests script
+          execution that nobody has decided on yet. Annotations land on the pull request and a
+          summary table on the job.
+        </p>
+
+        <h2 id="limits">What none of this tells you</h2>
+        <p>
+          Being straight about the edges, because a security tool that oversells itself is worse
+          than none:
+        </p>
+        <ul>
+          <li>
+            <strong>Behaviour that lives in a dependency is invisible here.</strong> In the table
+            above, <code>bcrypt</code> and <code>puppeteer</code> both reach the network during
+            install &mdash; but through <code>node-pre-gyp</code> and
+            <code>@puppeteer/browsers</code>, not through code in their own tarballs. "Nothing
+            matched" is accurate about the package and incomplete about the effect.
+          </li>
+          <li>
+            <strong>Only part of each file is read.</strong> Files are read up to 64 KiB, and
+            selection follows the install hooks, bin entry points, and the imports reachable from
+            them. A payload placed elsewhere in a large bundle is not examined.
+          </li>
+          <li>
+            <strong>Approve is not a safety certificate.</strong> It means the script does nothing
+            but invoke a local build toolchain. That is a narrow, checkable claim, not a promise
+            about the package as a whole.
+          </li>
+          <li>
+            <strong>The allowlist is per-package, not per-version</strong>, unless you pin. A bare
+            name keeps applying after an upgrade, which is convenient and is also how a compromised
+            release inherits your earlier approval. Re-run the review when a lockfile changes.
+          </li>
+        </ul>
+
+        <h2>Quick reference</h2>
+        <div class="table-wrap wide">
+          <table>
+            <thead><tr><th>Task</th><th>Command</th></tr></thead>
+            <tbody>
+              <tr><td>See what is pending</td><td class="mono">npm approve-scripts --allow-scripts-pending</td></tr>
+              <tr><td>Find out what those scripts do</td><td class="mono">npx npx-vibe approve-scripts</td></tr>
+              <tr><td>Write the decidable ones</td><td class="mono">npx npx-vibe approve-scripts --write</td></tr>
+              <tr><td>Approve one package, any version</td><td class="mono">npm approve-scripts &lt;pkg&gt; --no-allow-scripts-pin</td></tr>
+              <tr><td>Build the native modules after approving</td><td class="mono">npm rebuild &lt;pkg&gt;</td></tr>
+              <tr><td>Fail CI on a skipped script</td><td class="mono">npm ci --strict-allow-scripts</td></tr>
+              <tr><td>Check the trap</td><td class="mono">grep -r "ignore-scripts" .npmrc</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cta-band">
+          <h2 style="margin-bottom:12px">Start with the list you actually have</h2>
+          <p>
+            No install script is executed, nothing is written unless you pass <code>--write</code>,
+            and it works on npm 10, 11 and 12.
+          </p>
+          <div class="cmd">
+            <span class="cmd-prompt" aria-hidden="true">$</span>
+            <code>npx npx-vibe approve-scripts</code>
+            <button type="button" data-copy="npx npx-vibe approve-scripts">Copy</button>
+          </div>
+          <div class="hero-actions" style="margin-bottom:0">
+            <a class="btn btn-primary" href="./">How npx-vibe works</a>
+            <a class="btn btn-ghost" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">Source on GitHub</a>
+          </div>
+        </div>
+
+        <h2>Sources</h2>
+        <ul>
+          <li><a href="https://socket.dev/blog/npm-12">Socket &mdash; npm v12 ships with install scripts off by default</a></li>
+          <li><a href="https://github.blog/changelog/2026-06-09-upcoming-breaking-changes-for-npm-v12/">GitHub Changelog &mdash; upcoming breaking changes for npm v12</a></li>
+          <li><a href="https://github.com/npm/cli/issues/9450">npm/cli#9450 &mdash; allowScripts ignored when ignore-scripts=true</a></li>
+          <li><a href="https://docs.npmjs.com/cli/v12/commands/npm-install-scripts/">npm docs &mdash; install-script commands</a></li>
+        </ul>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p><strong>npx-vibe</strong> &middot; MIT licensed &middot; built by <a href="https://github.com/Devrajsinh-Jhala">Devrajsinh Jhala</a></p>
+        <nav aria-label="Footer">
+          <a href="./">Home</a>
+          <a href="https://www.npmjs.com/package/npx-vibe">npm</a>
+          <a href="https://github.com/marketplace/actions/npx-vibe">Marketplace</a>
+          <a href="./llms.txt">llms.txt</a>
+        </nav>
+      </div>
+      <p class="container disclaimer">
+        npx-vibe is a pre-execution review tool. It is not a sandbox, an antivirus engine, or a
+        guarantee of safety.
+      </p>
+    </footer>
+
+    <script src="./app.js?v=212" defer></script>
+  </body>
+</html>
