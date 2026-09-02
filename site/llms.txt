@@ -26,6 +26,14 @@ Decide which dependencies may run install scripts under npm 12:
 
     npx --yes npx-vibe@latest --agent approve-scripts
 
+## npm 12 migration guide
+
+https://devrajsinh-jhala.github.io/NPM-Vibe-check/npm-12-allowscripts.html
+
+How to triage npm 12 allowScripts: the three questions that matter, what the
+common install-script packages actually do, the ignore-scripts trap, and CI
+enforcement.
+
 ## GitHub Action
 
 Listed at https://github.com/marketplace/actions/npx-vibe

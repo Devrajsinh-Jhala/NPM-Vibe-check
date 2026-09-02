@@ -511,6 +511,15 @@ npx --yes npx-vibe@latest --agent --project .
 
 Agent mode keeps stdout machine-readable for successful, incomplete, and failed scans. It is deliberately incompatible with `--force`, npx-vibe's `--yes`, `--allow-install-scripts`, and package execution arguments.
 
+### npm 12 migration guide
+
+npm 12 turned install scripts off by default, and the hard part is not getting the
+list of pending packages &mdash; it is deciding. **[npm 12 allowScripts: how to decide what to
+approve](https://devrajsinh-jhala.github.io/NPM-Vibe-check/npm-12-allowscripts.html)**
+covers the three questions that matter, what the eight most common install-script
+packages actually do, the `.npmrc` setting that silently disables the whole
+allowlist system, and how to enforce the result in CI.
+
 ### GitHub Action
 
 [Listed on the GitHub Marketplace](https://github.com/marketplace/actions/npx-vibe). The action wraps the same CLI, so a workflow needs one step:

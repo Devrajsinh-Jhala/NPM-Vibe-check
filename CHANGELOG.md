@@ -2,6 +2,27 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 2.1.2 - 2026-09-02
+
+### Changed
+
+- An unrecognised install script now says which kind of unrecognised it is.
+  "No automatic rule recognises this" did not distinguish between "something
+  turned up that could not be classified" and "nothing turned up at all", which
+  need different responses. When no behavioural finding and no network host are
+  present, the reason now says so: unrecognised, not suspicious. Across the eight
+  most common install-script packages, five of six review decisions were in that
+  second category and said nothing useful before.
+- README links the npm 12 migration guide and the GitHub Marketplace listing.
+
+### Added
+
+- An npm 12 migration guide covering how to actually decide an allowScripts
+  entry: the three questions worth asking, what the common install-script
+  packages do, the `ignore-scripts=true` setting that silently disables the whole
+  allowlist system, and CI enforcement.
+  https://devrajsinh-jhala.github.io/NPM-Vibe-check/npm-12-allowscripts.html
+
 ## 2.1.1 - 2026-09-02
 
 ### Fixed
