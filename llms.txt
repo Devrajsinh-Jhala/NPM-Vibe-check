@@ -1,80 +1,71 @@
-# npx-vibe
+# npx-vibe 3.0.0
 
-> Evidence-first npm package and project dependency checks before code executes.
+> Evidence-first, read-only npm package preflights for humans, agents, MCP clients, and CI.
 
-npx-vibe is a zero-runtime-dependency Node.js CLI and MCP server that resolves public npm packages, downloads and verifies registry tarballs without executing package code, inspects install-time behavior, and reports Proceed, Caution, or Block with source evidence.
+Final planned release. Active maintenance ends October 2, 2026. No further compatibility updates or security patches are scheduled. Source and package remain available under MIT.
 
-## Canonical links
+## Canonical references
 
 - Website: https://devrajsinh-jhala.github.io/NPM-Vibe-check/
 - npm: https://www.npmjs.com/package/npx-vibe
-- Source and documentation: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check
+- README: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/README.md
+- Migration: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/MIGRATING.md
+- Maintenance: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/MAINTENANCE.md
+- Security: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/SECURITY.md
 - Agent Skill: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/tree/master/skills/npx-vibe
-- Security policy: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/SECURITY.md
+- MCP Registry identity: io.github.Devrajsinh-Jhala/npx-vibe
+- Registry: https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe
 
-## Agent-safe commands
+## Agent-safe CLI
 
-Inspect one package with versioned JSON output:
+    npx --yes npx-vibe@3.0.0 --agent <package-spec>
+    npx --yes npx-vibe@3.0.0 project --agent --include-dev
+    npx --yes npx-vibe@3.0.0 approve-scripts --agent
 
-    npx --yes npx-vibe@latest --agent <package-spec>
+Commands and flags must precede a package spec. The outer npx installs the scanner itself. Scanning does not execute the target. Only the explicit run command executes packages; do not use it for automated preflight.
 
-Inspect direct registry dependencies in the current project:
+Default project scans require a lockfile packages map (npm lockfile v2/v3). Generate one with npm install --package-lock-only --ignore-scripts. Explicit --direct-only selects a narrower review. Unsupported dependencies, package limits, or failures make the review incomplete and return exit 1.
 
-    npx --yes npx-vibe@latest --agent --project .
-
-Decide which dependencies may run install scripts under npm 12:
-
-    npx --yes npx-vibe@latest --agent approve-scripts
-
-## npm 12 migration guide
-
-https://devrajsinh-jhala.github.io/NPM-Vibe-check/npm-12-allowscripts.html
-
-How to triage npm 12 allowScripts: the three questions that matter, what the
-common install-script packages actually do, the ignore-scripts trap, and CI
-enforcement.
-
-## GitHub Action
-
-Listed at https://github.com/marketplace/actions/npx-vibe
-
-    - uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
-      with:
-        command: approve-scripts   # or project, or package
-        fail-on: caution           # block (default), caution, never
-
-Outputs are verdict (proceed, caution, block, error) and exit-code. An
-incomplete scan fails the step under every fail-on policy.
-
-Install the portable Agent Skill:
-
-    npx skills add Devrajsinh-Jhala/NPM-Vibe-check --skill npx-vibe -g
-
-## MCP server
-
-Start the local stdio server:
-
-    npx --yes npx-vibe@latest --mcp
-
-Dedicated global binary:
-
-    npx-vibe-mcp
-
-Tools:
-
-- scan_package: inspect one public npm package
-- scan_project: inspect direct registry dependencies in a project
-- list_models: inspect bundled provider/model recommendations
-
-MCP scan results return the same schemaVersion 1 decision envelope in structuredContent and a JSON text block. Tools are read-only and do not accept API keys as arguments. AI is off by default; credentials must be configured in the MCP server environment. The active official MCP Registry identifier is io.github.Devrajsinh-Jhala/npx-vibe: https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe
+New approve-scripts --write decisions are version-pinned. Review-needed entries are not written, incomplete reviews cannot write, and --agent rejects --write.
 
 ## Decision contract
 
-- schemaVersion: currently 1
-- decision.action=continue: the requested workflow may continue
-- decision.action=review: pause and request human review
-- decision.action=stop: do not install or execute
-- decision.action=retry: the scan was incomplete; fail closed
-- exit codes: 0 Proceed, 2 Caution, 3 Block, 1 operational error or incomplete project scan
+Schema 3. Require schemaVersion=3, status=complete, coverage.complete=true, and decision.action=continue before proceeding with an already authorized workflow.
 
-AI review is off by default. Online or local AI is opt-in and never replaces deterministic evidence. A Proceed verdict is a review signal, not proof that a package is safe.
+- continue: no blocking finding in the reviewed scope; not proof of safety
+- review: pause for explicit human review
+- stop: do not install or execute
+- retry: incomplete; resolve coverage or errors first
+- exit 0 Proceed; 2 Caution; 3 Block; 1 error/incomplete
+
+coverage contains scope, complete, requested, scanned, skipped, failed, reasons. Counts cover subjects in the requested scope, not every source file. decision.safeToExecute has been removed. --json is the raw report; --agent is the versioned decision envelope.
+
+## MCP
+
+    npx --yes --package=npx-vibe@3.0.0 npx-vibe-mcp
+
+Four tools: scan_package, scan_project, approve_scripts, list_providers.
+Protocol 2025-11-25; structured tool results use schema 3.
+Incomplete/error results set isError=true. Tools never execute targets or write permissions. API keys are never accepted as tool arguments.
+
+## AI
+
+AI is off by default. Online AI needs explicit opt-in, a provider, and an exact available model ID. --models lists provider configuration, not live models. Model profiles and bundled recommendations were removed in 2.0. Use provider-specific environment variables; never put credentials in tool arguments, generated commands, or output.
+
+    npx --yes npx-vibe@3.0.0 --agent --ai online --provider <provider> --model <model-id> <package-spec>
+
+Online AI sends bounded metadata and selected package source to the chosen provider. Source matching constrains AI findings; a model is not a trust authority.
+
+## GitHub Action
+
+    - uses: Devrajsinh-Jhala/NPM-Vibe-check@v3.0.0
+      with:
+        version: '3.0.0'
+        command: project
+        fail-on: caution
+
+Errors and incomplete scans fail under every fail-on policy. AI/history are disabled. Marketplace: https://github.com/marketplace/actions/npx-vibe
+
+## Limitations
+
+Selected, bounded source review; false positives and missed behavior are possible. OSV is supplementary; unavailable lookups are labeled, not reported as a clean lookup. Single-package scans do not recursively inspect all dependencies. Execution is separate from verification and not sandboxed. External services may change after maintenance ends.

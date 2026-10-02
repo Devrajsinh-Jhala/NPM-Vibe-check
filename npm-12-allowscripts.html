@@ -26,7 +26,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap"
     />
-    <link rel="stylesheet" href="./landing.css?v=212" />
+    <link rel="stylesheet" href="./landing.css?v=300" />
     <style>
       .guide { padding: 56px 0 96px; }
       .guide-head { max-width: 34ch; }
@@ -85,7 +85,7 @@
         <a class="brand" href="./">
           <span class="brand-mark" aria-hidden="true">nv</span>
           <span class="brand-name">npx-vibe</span>
-          <small>2.1.2</small>
+          <small>3.0.0</small>
         </a>
         <div class="nav-links">
           <a href="./#npm12">npm 12</a>
@@ -200,9 +200,9 @@ npm approve-scripts --allow-scripts-pending</code></pre>
             <code>authorized_keys</code> is persistence, not installation.</li>
         </ol>
         <p>
-          Everything else &mdash; compiling C++, checking whether a prebuilt binary already exists,
-          printing a funding notice &mdash; is noise. If a script does none of the three, it does
-          not deserve more of your attention than the thirty seconds it takes to confirm that.
+          These questions are a starting point, not an exhaustive security audit. A compiler,
+          generated build configuration, dependency, or delayed payload can still execute
+          unexpected behavior. Lack of a matching pattern is not proof of safety.
         </p>
 
         <h2 id="real-packages">What the common packages actually do</h2>
@@ -303,7 +303,7 @@ npm approve-scripts --allow-scripts-pending</code></pre>
           Reading eight tarballs by hand is the reason people rubber-stamp allowlists. This does the
           reading:
         </p>
-        <pre class="snippet"><code>npx npx-vibe approve-scripts</code></pre>
+        <pre class="snippet"><code>npx npx-vibe@3.0.0 approve-scripts</code></pre>
         <p>
           It reads <code>package-lock.json</code> for every dependency npm would let run an install
           script, downloads and integrity-checks each tarball, reads the script and the files it
@@ -323,24 +323,30 @@ npm approve-scripts --allow-scripts-pending</code></pre>
         </p>
         <pre class="snippet"><code>{
   "allowScripts": {
-    "bufferutil": true,
-    "utf-8-validate": true,
-    "esbuild": true,
-    "some-package": false
+    "bufferutil@4.0.9": true,
+    "utf-8-validate@6.0.5": true,
+    "esbuild@0.28.2": true,
+    "some-package@1.0.0": false
   }
 }</code></pre>
         <p>
-          <strong>Prefer bare names.</strong> A pinned <code>sharp@0.34.5</code> entry stops
-          applying the moment you bump the dependency, and you will be re-approving on every
-          upgrade. Pin only where you genuinely want a fresh decision each time.
+          <strong>Prefer exact-version permissions.</strong> A dependency upgrade changes the
+          code you are approving; it deserves a fresh decision. npx-vibe 3.0.0 always pins new
+          decisions and preserves existing denies. The entries above illustrate permissions
+          after review; they are not an allowlist to copy into an unrelated project.
         </p>
         <p>To have the unambiguous decisions written for you:</p>
-        <pre class="snippet"><code>npx npx-vibe approve-scripts --write</code></pre>
+        <pre class="snippet"><code>npx npx-vibe@3.0.0 approve-scripts --write</code></pre>
         <p>
           This writes only the packages it could decide: <code>true</code> for approve,
           <code>false</code> for deny. <strong>Anything needing review is deliberately left
           out.</strong> Auto-approving the ambiguous middle would recreate exactly the rubber stamp
           the allowlist exists to replace. Commit the result so your machine and your CI agree.
+        </p>
+        <p>
+          If the lockfile lacks a <code>resolved</code> URL, npm cannot enforce a version pin.
+          npx-vibe leaves that entry for review instead of writing an ineffective permission;
+          refresh the lockfile without scripts and review again. Incomplete reviews never write.
         </p>
 
         <h2 id="ci">Step 5: enforce it in CI</h2>
@@ -357,8 +363,9 @@ npm approve-scripts --allow-scripts-pending</code></pre>
           To catch an unreviewed script at the point it enters the lockfile &mdash; in the pull
           request, rather than in a deploy &mdash; add the review to your workflow:
         </p>
-        <pre class="snippet"><code>- uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
+        <pre class="snippet"><code>- uses: Devrajsinh-Jhala/NPM-Vibe-check@v3.0.0
   with:
+    version: '3.0.0'
     command: approve-scripts
     fail-on: caution</code></pre>
         <p>
@@ -391,9 +398,9 @@ npm approve-scripts --allow-scripts-pending</code></pre>
             about the package as a whole.
           </li>
           <li>
-            <strong>The allowlist is per-package, not per-version</strong>, unless you pin. A bare
-            name keeps applying after an upgrade, which is convenient and is also how a compromised
-            release inherits your earlier approval. Re-run the review when a lockfile changes.
+            <strong>Bare names still authorize future versions.</strong> npx-vibe pins new
+            decisions but does not remove your existing broad permissions. Audit those entries
+            yourself, and re-run the review when the lockfile changes.
           </li>
         </ul>
 
@@ -403,8 +410,8 @@ npm approve-scripts --allow-scripts-pending</code></pre>
             <thead><tr><th>Task</th><th>Command</th></tr></thead>
             <tbody>
               <tr><td>See what is pending</td><td class="mono">npm approve-scripts --allow-scripts-pending</td></tr>
-              <tr><td>Find out what those scripts do</td><td class="mono">npx npx-vibe approve-scripts</td></tr>
-              <tr><td>Write the decidable ones</td><td class="mono">npx npx-vibe approve-scripts --write</td></tr>
+              <tr><td>Find out what those scripts do</td><td class="mono">npx npx-vibe@3.0.0 approve-scripts</td></tr>
+              <tr><td>Write the decidable ones</td><td class="mono">npx npx-vibe@3.0.0 approve-scripts --write</td></tr>
               <tr><td>Approve one package, any version</td><td class="mono">npm approve-scripts &lt;pkg&gt; --no-allow-scripts-pin</td></tr>
               <tr><td>Build the native modules after approving</td><td class="mono">npm rebuild &lt;pkg&gt;</td></tr>
               <tr><td>Fail CI on a skipped script</td><td class="mono">npm ci --strict-allow-scripts</td></tr>
@@ -421,8 +428,8 @@ npm approve-scripts --allow-scripts-pending</code></pre>
           </p>
           <div class="cmd">
             <span class="cmd-prompt" aria-hidden="true">$</span>
-            <code>npx npx-vibe approve-scripts</code>
-            <button type="button" data-copy="npx npx-vibe approve-scripts">Copy</button>
+            <code>npx npx-vibe@3.0.0 approve-scripts</code>
+            <button type="button" data-copy="npx npx-vibe@3.0.0 approve-scripts">Copy</button>
           </div>
           <div class="hero-actions" style="margin-bottom:0">
             <a class="btn btn-primary" href="./">How npx-vibe works</a>
