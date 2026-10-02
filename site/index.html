@@ -37,8 +37,8 @@
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap"
     />
     <script>document.documentElement.classList.add("js");</script>
-    <link rel="stylesheet" href="./landing.css?v=212" />
-    <script src="./app.js?v=212" defer></script>
+    <link rel="stylesheet" href="./landing.css?v=300" />
+    <script src="./app.js?v=300" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -48,7 +48,7 @@
         <a class="brand" href="#top">
           <span class="brand-mark" aria-hidden="true">nv</span>
           <span class="brand-name">npx-vibe</span>
-          <small>2.1.2</small>
+          <small>3.0.0</small>
         </a>
 
         <div class="nav-links">
@@ -66,12 +66,17 @@
     </header>
 
     <main id="main">
+      <aside class="release-note container" aria-label="Maintenance status">
+        <strong>Final release · 3.0.0</strong>
+        <span>Available under MIT. Active maintenance has ended; no future security patches are scheduled.</span>
+        <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/MAINTENANCE.md">Support policy &rarr;</a>
+      </aside>
       <section class="hero" id="top">
         <div class="container hero-grid">
           <div class="hero-copy">
-            <a class="pill" href="#npm12">
-              <span class="pill-tag">New in 2.0</span>
-              <span>approve-scripts for npm 12</span>
+            <a class="pill" href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/MIGRATING.md">
+              <span class="pill-tag">New in 3.0</span>
+              <span>Explicit coverage. Pinned permissions.</span>
               <i aria-hidden="true">&rarr;</i>
             </a>
 
@@ -85,8 +90,8 @@
 
             <div class="cmd">
               <span class="cmd-prompt" aria-hidden="true">$</span>
-              <code>npx npx-vibe approve-scripts</code>
-              <button type="button" data-copy="npx npx-vibe approve-scripts">Copy</button>
+              <code>npx npx-vibe@3.0.0 approve-scripts</code>
+              <button type="button" data-copy="npx npx-vibe@3.0.0 approve-scripts">Copy</button>
             </div>
 
             <div class="hero-actions">
@@ -96,7 +101,7 @@
 
             <dl class="facts">
               <div><dt>0</dt><dd>runtime dependencies</dd></div>
-              <div><dt>98</dt><dd>automated tests</dd></div>
+              <div><dt>120</dt><dd>automated tests</dd></div>
               <div><dt data-weekly-downloads>&mdash;</dt><dd>downloads last week</dd></div>
             </dl>
           </div>
@@ -113,14 +118,15 @@
               <button class="demo-tab" data-demo="scan" role="tab" aria-selected="false" type="button">scan</button>
               <button class="demo-tab" data-demo="advisory" role="tab" aria-selected="false" type="button">advisories</button>
               <button class="demo-tab" data-demo="agent" role="tab" aria-selected="false" type="button">agent JSON</button>
+              <button class="demo-tab" data-demo="incomplete" role="tab" aria-selected="false" type="button">coverage</button>
               <button class="demo-tab" data-demo="block" role="tab" aria-selected="false" type="button">block</button>
             </div>
 
-            <pre class="term-body"><code id="demo-output">$ npx npx-vibe approve-scripts
+            <pre class="term-body"><code id="demo-output">$ npx npx-vibe@3.0.0 approve-scripts
 ! npx-vibe approve-scripts: 2 need review
 my-app@1.0.0
 
-Dependencies with install scripts: 4  Already allowed: 2
+Dependencies with install scripts: 4  Already allowed: 2  Already denied: 0
 Reviewed now: 2  approve 0  review 2  deny 0
 
 REVIEW   better-sqlite3@11.10.0
@@ -137,8 +143,8 @@ No install script was executed during this review.
 2 package(s) need a human decision; --write never records those.</code></pre>
 
             <figcaption id="demo-note">
-              npm 12 blocks install scripts until you allow them. This is the review that
-              tells you which ones deserve it, with the source line behind each decision.
+              Illustrative project output. The esbuild evidence is from a verified scan;
+              no install script was executed. Tabs show abbreviated results, not live scans.
             </figcaption>
           </figure>
         </div>
@@ -181,7 +187,7 @@ No install script was executed during this review.
                 <li><span class="verdict verdict-bad">deny</span> Reads credentials and sends them. Not a judgement call.</li>
               </ul>
               <p class="muted-note">
-                <code>--write</code> records only the unambiguous decisions. Anything needing
+                <code>--write</code> records exact-version permissions only for unambiguous decisions. Anything needing
                 review is deliberately left for a person.
               </p>
             </div>
@@ -206,8 +212,7 @@ No install script was executed during this review.
             <h3>Resolve and verify</h3>
             <p>
               Resolve the exact version npm would install, download the registry tarball,
-              and check it against the registry&rsquo;s own integrity hash before anything
-              is read.
+              and check registry integrity plus any recorded project lockfile integrity.
             </p>
           </li>
           <li>
@@ -223,7 +228,7 @@ No install script was executed during this review.
             <span class="step-n">03</span>
             <h3>Decide with evidence</h3>
             <p>
-              Every finding carries a file, a line number, and the matched source. Known
+              Source-backed findings carry a file, a line number, and the matched text. Known
               advisories come from OSV. Registry age and popularity are shown as context and
               never move the score.
             </p>
@@ -249,40 +254,58 @@ No install script was executed during this review.
             <article class="card">
               <h3>Command line</h3>
               <p>Scanning is the default and never executes anything. <code>npx-vibe run</code> is the only command that does.</p>
-              <pre class="snippet"><code>npx npx-vibe esbuild
-npx npx-vibe run esbuild -- --version</code></pre>
+              <pre class="snippet"><code>npx npx-vibe@3.0.0 esbuild
+npx npx-vibe@3.0.0 run cowsay -- hello</code></pre>
             </article>
 
             <article class="card">
               <h3>MCP server</h3>
               <p>Four schema-backed, read-only tools over stdio. Credentials never travel as tool arguments.</p>
-              <pre class="snippet"><code>npx npx-vibe --mcp</code></pre>
+              <pre class="snippet"><code>npx --yes --package=npx-vibe@3.0.0 npx-vibe-mcp</code></pre>
               <p class="card-note">scan_package &middot; scan_project &middot; approve_scripts &middot; list_providers</p>
             </article>
 
             <article class="card">
               <h3>Any other CI</h3>
-              <p>Exit 0 proceed, 2 review, 3 block. Nothing GitHub-specific is required.</p>
-              <pre class="snippet"><code>npx npx-vibe --project . --json
-npx npx-vibe approve-scripts</code></pre>
+              <p>Exit 0 proceed, 2 review, 3 block, 1 incomplete. Nothing GitHub-specific is required.</p>
+              <pre class="snippet"><code>npx npx-vibe@3.0.0 project --json
+npx npx-vibe@3.0.0 approve-scripts</code></pre>
             </article>
 
             <article class="card">
               <h3>Coding agents</h3>
-              <p>Versioned, fail-closed JSON. An agent continues only on <code>action: "continue"</code>.</p>
-              <pre class="snippet"><code>npx --yes npx-vibe@latest --agent &lt;package&gt;</code></pre>
+              <p>Schema 3 JSON. Continue only with complete requested coverage and <code>action: "continue"</code>.</p>
+              <pre class="snippet"><code>npx --yes npx-vibe@3.0.0 --agent &lt;package&gt;</code></pre>
             </article>
 
             <article class="card">
               <h3>GitHub Action</h3>
               <p>One step. Annotations and a job summary, with a <code>fail-on</code> policy you choose.</p>
-              <pre class="snippet"><code>- uses: Devrajsinh-Jhala/NPM-Vibe-check@v2
+              <pre class="snippet"><code>- uses: Devrajsinh-Jhala/NPM-Vibe-check@v3.0.0
   with:
+    version: '3.0.0'
     command: approve-scripts
     fail-on: caution</code></pre>
               <p class="card-note"><a href="https://github.com/marketplace/actions/npx-vibe">On the GitHub Marketplace</a></p>
             </article>
           </div>
+          <div class="demo-gallery" data-reveal>
+            <figure>
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="./assets/npx-vibe-agent-demo-poster.png" />
+                <img src="./assets/npx-vibe-agent-demo.gif" width="1200" height="675" loading="lazy" alt="Illustrative agent preflight: verify, inspect, then pause on a Caution result using schema 3." />
+              </picture>
+              <figcaption><strong>Agent preflight</strong> A review signal pauses the workflow before execution.</figcaption>
+            </figure>
+            <figure>
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="./assets/npx-vibe-mcp-demo-poster.png" />
+                <img src="./assets/npx-vibe-mcp-demo.gif" width="1200" height="675" loading="lazy" alt="Illustrative MCP flow: initialize, discover four read-only tools, scan a package, return schema 3 structured output." />
+              </picture>
+              <figcaption><strong>MCP, natively</strong> Four read-only tools. Credentials stay out of tool arguments.</figcaption>
+            </figure>
+          </div>
+          <p class="band-foot">Animations are abbreviated illustrations of an esbuild@0.28.2 Caution scan, not live model calls. <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check#optional-ai-review">Optional AI setup &rarr;</a></p>
         </div>
       </section>
 
@@ -293,8 +316,8 @@ npx npx-vibe approve-scripts</code></pre>
         <div class="evidence-grid">
           <div data-reveal>
             <p>
-              A number you cannot audit is a number you eventually ignore. Every deterministic
-              finding names the file, the line, and the text that matched, so you can disagree
+              A number you cannot audit is a number you eventually ignore. Source-based
+              findings show the file, the line, and the text that matched, so you can disagree
               with the tool and be right.
             </p>
             <p>
@@ -347,19 +370,21 @@ npx npx-vibe approve-scripts</code></pre>
               <p>
                 Compromises reach you through a transitive dependency, so a project scan walks
                 the whole installed tree from <code>package-lock.json</code> by default.
-                Download counts and advisories are batched, so a large tree is a couple of
-                requests rather than hundreds.
+                Download counts and advisories are batched. Package metadata and tarballs
+                are still fetched separately for each reviewed artifact.
               </p>
-              <pre class="snippet"><code>npx npx-vibe --project .
-npx npx-vibe --project . --direct-only
-npx npx-vibe --project . --include-dev --ci</code></pre>
+              <pre class="snippet"><code>npx npx-vibe@3.0.0 project
+npx npx-vibe@3.0.0 project --direct-only
+npx npx-vibe@3.0.0 project --include-dev --ci</code></pre>
             </div>
             <div class="split-col">
               <p>
                 Workspace links, git dependencies and URL specifiers stay outside the
                 registry-only trust boundary and are reported as skipped rather than resolved
-                through another path. Without a lockfile the scan narrows to direct
-                dependencies and says so, instead of failing.
+                through another path. Skipped dependencies, scan errors, or package limits
+                produce an incomplete result, never a passing whole-tree check. Without a
+                usable lockfile, choose <code>--direct-only</code> explicitly or generate one
+                without executing scripts.
               </p>
               <pre class="snippet"><code>Scanned: 68/68 dependencies (direct and transitive)
 Proceed: 68  Caution: 0  Block: 0</code></pre>
@@ -377,8 +402,8 @@ Proceed: 68  Caution: 0  Block: 0</code></pre>
           </p>
           <div class="cmd cmd-center">
             <span class="cmd-prompt" aria-hidden="true">$</span>
-            <code>npx npx-vibe approve-scripts</code>
-            <button type="button" data-copy="npx npx-vibe approve-scripts">Copy</button>
+            <code>npx npx-vibe@3.0.0 approve-scripts</code>
+            <button type="button" data-copy="npx npx-vibe@3.0.0 approve-scripts">Copy</button>
           </div>
           <div class="hero-actions hero-actions-center">
             <a class="btn btn-primary" href="https://www.npmjs.com/package/npx-vibe">Get it on npm</a>
@@ -398,6 +423,7 @@ Proceed: 68  Caution: 0  Block: 0</code></pre>
           <a href="https://www.npmjs.com/package/npx-vibe">npm</a>
           <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check">GitHub</a>
           <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/SECURITY.md">Security</a>
+          <a href="https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/blob/master/MIGRATING.md">Migration</a>
           <a href="./llms.txt">llms.txt</a>
         </nav>
       </div>

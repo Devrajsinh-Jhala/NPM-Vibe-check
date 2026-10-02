@@ -8,11 +8,11 @@ Report security concerns through GitHub's private vulnerability reporting featur
 
 https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/security/advisories/new
 
-Include the affected version, a minimal reproduction, expected impact, and any suggested mitigation. Reports will be acknowledged as quickly as possible and handled before public disclosure when the issue is confirmed.
+Include the affected version, a minimal reproduction, expected impact, and any suggested mitigation. Active maintenance has ended; reports may not receive a response or a patch. Do not depend on a guaranteed remediation timeline.
 
 ## Supported versions
 
-Security fixes are provided for the latest published version of `npx-vibe`.
+Version 3.0.0 is the final planned release. No versions receive scheduled security fixes. See [the maintenance policy](MAINTENANCE.md) before relying on this tool in a security-sensitive workflow.
 
 ## Security boundary
 

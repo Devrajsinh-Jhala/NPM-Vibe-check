@@ -154,14 +154,15 @@ test("agent package output exposes a versioned decision envelope", () => {
     findings: [],
   }, { kind: "package-scan", exitCode: 2, version: "1.4.0" }));
 
-  assert.equal(payload.schemaVersion, 2);
+  assert.equal(payload.schemaVersion, 3);
   assert.equal(payload.tool.version, "1.4.0");
   assert.equal(payload.kind, "package-scan");
   assert.equal(payload.status, "complete");
   assert.equal(payload.decision.action, "review");
   assert.equal(payload.decision.requiresHumanReview, true);
   assert.equal(payload.decision.requiresApproval, true);
-  assert.equal(payload.decision.safeToExecute, false);
+  assert.equal(Object.hasOwn(payload.decision, "safeToExecute"), false);
+  assert.equal(payload.coverage.complete, true);
   assert.equal(payload.decision.mayContinue, false);
   assert.equal(payload.subject.name, "esbuild");
 });
@@ -187,4 +188,33 @@ test("agent errors remain valid JSON with a fail-closed decision", () => {
   assert.equal(payload.decision.exitCode, 1);
   assert.equal(payload.decision.mustStop, true);
   assert.match(payload.error.message, /Missing package/);
+});
+
+test("agent consumers cannot continue when the report contains skipped coverage", () => {
+  const payload = JSON.parse(toAgentResult({
+    project: { name: "app", transitive: true }, verdict: { verdict: "proceed", score: 0 },
+    summary: { discovered: 2, scanned: 1, skipped: 1 },
+    skipped: [{ reason: "package limit" }], errors: [],
+  }, { kind: "project-scan", exitCode: 0 }));
+  assert.equal(payload.status, "incomplete");
+  assert.equal(payload.decision.action, "retry");
+  assert.equal(payload.decision.exitCode, 1);
+  assert.equal(payload.decision.mayContinue, false);
+  assert.equal(payload.coverage.complete, false);
+});
+
+test("dashboard execution hints match the CLI grammar and do not run non-executable libraries", () => {
+  const result = {
+    package: { name: "library", version: "1.0.0" }, profile: {},
+    verdict: { verdict: "proceed", score: 0 },
+    stats: { weeklyDownloads: 10, lifecycleScripts: [], selectedFileCount: 1, fileCount: 1 },
+    findings: [], ai: { status: "skipped", reason: "not requested" },
+    execution: { npmPackage: "library@1.0.0", binError: "No bin" },
+  };
+  assert.doesNotMatch(renderDashboard(result), /Run it with:/);
+  result.verdict = { verdict: "block", score: 100 };
+  assert.match(renderDashboard(result), /npx-vibe run --force library@1\.0\.0/);
+  result.verdict = { verdict: "proceed", score: 0 };
+  result.execution = { npmPackage: "typescript@5.9.2", bin: "tsc" };
+  assert.match(renderDashboard(result), /npx-vibe run --bin tsc typescript@5\.9\.2/);
 });

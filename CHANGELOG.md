@@ -2,6 +2,32 @@
 
 All notable changes to `npx-vibe` are documented here.
 
+## 3.0.0 - 2026-10-02
+
+### Breaking
+
+- Agent and MCP results use schema 3 with explicit coverage. Removed `decision.safeToExecute`; incomplete reviews return `retry` and MCP `isError: true`.
+- Default project scans require an npm lockfile with a packages map. Direct-only scans must be explicitly selected. Skipped dependencies and package limits now fail closed with exit 1.
+- New install-script permissions are always version-pinned. Agent mode rejects permission writes; incomplete script reviews cannot modify the manifest.
+- Implicit native builds and partially inspected source require human review.
+- The GitHub Action defaults to the exact 3.0.0 release.
+
+### Fixed
+
+- Verify downloaded packages against project lockfile integrity as well as registry metadata.
+- Report unsupported aliases, links, and foreign-registry dependencies instead of silently reviewing a different registry artifact.
+- Recognize native build commands only when the whole command matches; shell redirection, substitution, and unrelated commands cannot inherit approval.
+- Preserve explicit denied permissions and require review when missing lockfile resolution metadata prevents npm from enforcing a version pin.
+- Keep equal-name/version copies with different sources or integrity visible in coverage.
+- Distinguish an unavailable or disabled vulnerability lookup from a successful lookup with no advisories.
+- Isolate Action installation directories and fail on unexpected scan exit codes.
+- Fix execution hints to place scanner flags before the package, preserve resolved versions and selected binaries, and avoid suggesting execution of a library without a binary.
+
+### Documentation
+
+- Updated website, animated demos, Agent Skill, machine-readable documentation, release guide, and migration instructions for schema 3.
+- Added an explicit final-release and end-of-maintenance policy. No further updates or security patches are scheduled.
+
 ## 2.1.2 - 2026-09-02
 
 ### Changed

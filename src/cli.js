@@ -149,7 +149,9 @@ async function runApproveScripts(config, env) {
   const exitCode = scriptApprovalExitCode(report);
 
   if (config.write) {
-    report.write = applyAllowScripts(project.manifestPath, buildAllowScriptsPatch(report, config));
+    report.write = exitCode === 1
+      ? { written: false, reason: "Coverage is incomplete; no allowScripts entries were written." }
+      : applyAllowScripts(project.manifestPath, buildAllowScriptsPatch(report, config));
   }
 
   if (config.agent) {
@@ -185,6 +187,12 @@ export async function reviewPackage(packageSpecInput, config = {}) {
   const snapshot = await loadPackageSnapshot(spec, config);
   const tarball = await downloadTarball(snapshot.tarball, config);
   const integrity = verifyTarball(tarball, snapshot);
+  if (!integrity.checked) throw new Error("Registry tarball has no supported integrity metadata; verification could not complete.");
+  if (config.lockedIntegrity) {
+    const locked = verifyTarball(tarball, { integrity: config.lockedIntegrity });
+    if (!locked.checked) throw new Error("Lockfile integrity metadata is unsupported; verification could not complete.");
+    integrity.ok = integrity.ok && locked.ok;
+  }
   const tarballInspection = inspectTarball(tarball, config);
 
   if (!integrity.ok) {
@@ -192,7 +200,7 @@ export async function reviewPackage(packageSpecInput, config = {}) {
       severity: "critical",
       code: "integrity_mismatch",
       file: null,
-      detail: "Downloaded tarball did not match npm registry integrity metadata.",
+      detail: "Downloaded tarball did not match registry or project lockfile integrity metadata.",
     });
   }
 
@@ -543,8 +551,8 @@ export function parseArgs(argv, env = process.env) {
     throw new Error("Use either --ci or --json so machine-readable output remains valid.");
   }
 
-  if (config.agent && (config.yes || config.force || config.allowInstallScripts)) {
-    throw new Error("--agent is read-only and cannot be combined with --yes, --force, or --allow-install-scripts.");
+  if (config.agent && (config.yes || config.force || config.allowInstallScripts || config.write)) {
+    throw new Error("--agent is read-only and cannot be combined with --yes, --force, --allow-install-scripts, or --write.");
   }
 
   for (const [flag, enabled] of [
@@ -825,16 +833,17 @@ function helpText() {
   return `npx-vibe - cautious npm exec wrapper
 
 Usage:
-  npx-vibe [options] <package-spec> [-- package args]
+  npx-vibe [options] <package-spec>
+  npx-vibe run [options] <package-spec> [-- package args]
   npx-vibe --project <directory|package.json> [options]
   npx-vibe approve-scripts [--project <path>] [--write]
 
 Examples:
-  npx-vibe cowsay -- hello
+  npx-vibe run cowsay -- hello
   npx-vibe --check obscure-package
   npx-vibe --json obscure-package
   npx-vibe --agent obscure-package
-  npx-vibe --bin tsc typescript -- --version
+  npx-vibe run --bin tsc typescript -- --version
   npx-vibe --project .
   npx-vibe --project . --include-dev --json
   npx-vibe --project . --transitive
@@ -845,9 +854,9 @@ Examples:
   npx-vibe --mcp
   npx-vibe --project . --ci
   npx-vibe --models
-  npx-vibe --provider gemini --api-key ... obscure-package
-  OPENAI_API_KEY=... npx-vibe --ai online obscure-package
-  ANTHROPIC_API_KEY=... npx-vibe --ai online obscure-package
+  npx-vibe --ai online --provider gemini --model <id> obscure-package
+  OPENAI_API_KEY=... npx-vibe --ai online --model <id> obscure-package
+  ANTHROPIC_API_KEY=... npx-vibe --ai online --model <id> obscure-package
   npx-vibe --ai online --provider gemini --model <id> --api-key ... obscure-package
   npx-vibe --ai online --provider custom --api-url https://models.example/v1/chat/completions --model my-model --api-key ... obscure-package
   npx-vibe --ai ollama --ollama-model qwen2.5-coder obscure-package
@@ -860,7 +869,7 @@ Commands:
     --write                  Record the unambiguous decisions in package.json
                              allowScripts. Packages needing review are never
                              written; a person decides those.
-    --pin                    Write name@version keys instead of bare names
+    --pin                    Compatibility alias; writes are always version-pinned
     --all                    Re-review packages already in allowScripts
 
 Options:
@@ -868,10 +877,11 @@ Options:
   --json                     Print JSON result; implies --check
   --agent                    Versioned, read-only JSON for coding agents; disables review-memory writes
   --mcp                      Start the read-only MCP server over stdio
-  --project <path>           Scan direct registry dependencies without executing them
+  --project <path>           Scan the lockfile dependency tree without executing code
   --include-dev              Include devDependencies in a project scan
   --transitive               Scan the whole installed tree from package-lock.json
-  --max-packages <1-5000>    Cap packages scanned in a project; default 500
+  --direct-only              Explicitly review manifest dependencies only; allows no lockfile
+  --max-packages <1-5000>     Default 500; omitted packages make coverage incomplete
   --ci                       Emit GitHub Actions annotations and a job summary
   --concurrency <1-8>        Heuristic project-scan concurrency; default 3
   --ai-limit <0-100>         Maximum triggered AI reviews per project scan; default 3
@@ -937,11 +947,13 @@ Start over stdio:
 
 Tools:
   scan_package   Verify and inspect one public npm package
-  scan_project   Scan direct registry dependencies from a project
-  list_models    Return bundled provider model recommendations
+  scan_project   Review a locked registry dependency tree (directOnly opts out)
+  approve_scripts  Read-only install-script permission recommendations
+  list_providers  List providers and configuration, not live model discovery
 
 The server writes newline-delimited JSON-RPC to stdout. Package code is never
 executed, scan tools are read-only, AI is off unless a tool call explicitly
 enables it, and provider credentials are read only from environment variables.
+Tool results use schema 3 with explicit coverage. Incomplete results require retry.
 `;
 }

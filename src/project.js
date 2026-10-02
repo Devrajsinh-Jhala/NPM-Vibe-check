@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fetchAdvisories } from "./advisories.js";
 import { fetchBulkDownloads } from "./registry.js";
 import { compareVersions, parsePackageSpec, parseVersion } from "./spec.js";
+import { reviewCoverage } from "./coverage.js";
 
 
 const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies"];
@@ -90,7 +91,7 @@ export function collectProjectDependencies(project, options = {}) {
 
   const direct = [...dependencies.values()]
     .sort((left, right) => left.name.localeCompare(right.name))
-    .map((dependency) => resolveProjectDependency(dependency, project.lockfile));
+    .map((dependency) => resolveProjectDependency(dependency, project.lockfile, options));
 
   if (!options.transitive) {
     return direct;
@@ -109,14 +110,15 @@ function collectTransitiveDependencies(project, direct, options = {}) {
 
   // Keyed by name@version, so a second copy of a direct dependency pinned to a
   // different version elsewhere in the tree is still reviewed.
-  const seen = new Set(direct.map((dependency) => dependency.packageSpec));
+  const seen = new Set(direct.map((dependency) =>
+    lockedArtifactKey(dependency.name, entries[`node_modules/${dependency.name}`] ?? {})));
   const collected = new Map();
 
   for (const [location, entry] of Object.entries(entries)) {
     if (!location || !entry || typeof entry !== "object" || !location.includes("node_modules/")) {
       continue;
     }
-    if (entry.link || entry.extraneous) {
+    if (entry.extraneous) {
       continue;
     }
     if (entry.dev && !options.includeDev) {
@@ -125,28 +127,24 @@ function collectTransitiveDependencies(project, direct, options = {}) {
 
     const name = location.split("node_modules/").pop();
     const version = entry.version;
-    if (!name || !parseVersion(version)) {
-      continue;
-    }
-    if (!String(entry.resolved ?? "").toLowerCase().startsWith("http")) {
+    if (!name) {
       continue;
     }
 
-    const key = `${name}@${version}`;
+    const key = lockedArtifactKey(name, entry);
     if (seen.has(key) || collected.has(key)) {
       continue;
     }
-    collected.set(key, {
+    collected.set(key, lockedDependency({
       name,
-      requested: version,
+      requested: String(version ?? entry.resolved ?? "unknown"),
       groups: [entry.dev ? "transitive (dev)" : "transitive"],
-      packageSpec: key,
-      resolvedFrom: "package-lock.json",
-    });
+    }, entry, options));
   }
 
   return [...collected.values()].sort((left, right) =>
-    left.name.localeCompare(right.name) || compareVersions(left.requested, right.requested)
+    left.name.localeCompare(right.name) || (parseVersion(left.requested) && parseVersion(right.requested)
+      ? compareVersions(left.requested, right.requested) : left.requested.localeCompare(right.requested))
   );
 }
 
@@ -157,20 +155,20 @@ export async function scanProject(input, options, reviewer) {
 
   const project = loadProjectManifest(input, options);
 
-  // Transitive is the default in v2, so a project with no lockfile has to degrade
-  // to direct dependencies rather than fail. Only an explicit --transitive is
-  // treated as a hard requirement.
-  const transitive = Boolean(options.transitive) && Boolean(project.lockfile);
-  const transitiveFallback = Boolean(options.transitive) && !project.lockfile;
-  if (transitiveFallback && options.transitiveExplicit) {
+  const requestedTree = options.transitive !== false;
+  const hasDependencies = collectProjectDependencies(project, { includeDev: options.includeDev }).length > 0;
+  const usableTree = project.lockfile?.packages && typeof project.lockfile.packages === "object"
+    && !Array.isArray(project.lockfile.packages);
+  if (project.lockfileError) throw new Error(project.lockfileError);
+  if (requestedTree && hasDependencies && !usableTree) {
     throw new Error(
-      project.lockfileError
-        ? `Transitive scanning needs a readable package-lock.json: ${project.lockfileError}`
-        : "Transitive scanning needs a package-lock.json next to package.json. Run npm install first."
+      "Dependency-tree scanning needs a package-lock.json with a packages map (npm lockfile v2/v3). "
+        + "Generate it with npm install --package-lock-only --ignore-scripts, or explicitly use --direct-only."
     );
   }
+  const transitive = requestedTree && Boolean(usableTree);
 
-  const scanOptions = { ...options, transitive };
+  const scanOptions = { ...options, transitive, requireLockedVersion: transitive };
   const discovered = collectProjectDependencies(project, scanOptions);
   const maxPackages = Number(options.projectMaxPackages ?? 500);
   const allReviewable = discovered.filter((dependency) => dependency.packageSpec);
@@ -192,14 +190,14 @@ export async function scanProject(input, options, reviewer) {
   let aiSuppressed = 0;
 
   // Fetch weekly download counts for the whole scan in one or two requests.
-  const downloadsCache = await fetchBulkDownloads(reviewable.map((dependency) => dependency.name), options)
+  const downloadsCache = options.downloadsCache ?? await fetchBulkDownloads(reviewable.map((dependency) => dependency.name), options)
     .catch(() => new Map());
-  const advisoriesCache = options.advisories === false
+  const advisoriesCache = options.advisoriesCache ?? (options.advisories === false
     ? new Map()
     : await fetchAdvisories(
         reviewable.map((dependency) => ({ name: dependency.name, version: dependency.requested })),
         options
-      ).catch(() => new Map());
+      ).catch(() => new Map()));
   const baseOptions = { ...scanOptions, downloadsCache, advisoriesCache };
 
   const reviewOne = async (dependency, index, reviewOptions = baseOptions) => {
@@ -208,6 +206,7 @@ export async function scanProject(input, options, reviewer) {
         ...reviewOptions,
         githubMetadata: false,
         check: true,
+        lockedIntegrity: dependency.integrity,
       });
       const result = {
         ...reviewed.result,
@@ -215,6 +214,7 @@ export async function scanProject(input, options, reviewer) {
           requested: dependency.requested,
           groups: dependency.groups,
           resolvedFrom: dependency.resolvedFrom,
+          integrity: dependency.integrity ?? null,
         },
       };
       packages[index] = result;
@@ -256,6 +256,15 @@ export async function scanProject(input, options, reviewer) {
     summary[result.verdict.verdict] += 1;
     return summary;
   }, { proceed: 0, caution: 0, block: 0 });
+  const coverage = reviewCoverage({
+    scope: transitive ? "dependency-tree" : "direct-dependencies",
+    requested: discovered.length,
+    scanned: completed.length,
+    skipped: skipped.length,
+    failed: errors.length,
+    reasons: [...skipped.map((entry) => `${entry.name}: ${entry.reason}`),
+      ...errors.map((entry) => `${entry.name}: ${entry.message}`)],
+  });
 
   return {
     kind: "project",
@@ -267,9 +276,10 @@ export async function scanProject(input, options, reviewer) {
       lockfileError: project.lockfileError,
       includeDev: Boolean(options.includeDev),
       transitive,
-      transitiveFallback,
+      transitiveFallback: false,
     },
     verdict,
+    coverage,
     summary: {
       discovered: discovered.length,
       scanned: completed.length,
@@ -290,7 +300,7 @@ export async function scanProject(input, options, reviewer) {
 }
 
 export function projectExitCode(scan) {
-  if (scan.errors.length > 0) {
+  if (scan.errors.length > 0 || scan.skipped?.length > 0 || scan.coverage?.complete === false) {
     return 1;
   }
   if (scan.verdict.verdict === "block") {
@@ -302,7 +312,7 @@ export function projectExitCode(scan) {
   return 0;
 }
 
-function resolveProjectDependency(dependency, lockfile) {
+function resolveProjectDependency(dependency, lockfile, options = {}) {
   try {
     parsePackageSpec(dependency.name);
   } catch (error) {
@@ -314,14 +324,11 @@ function resolveProjectDependency(dependency, lockfile) {
     return { ...dependency, packageSpec: null, reason: unsupportedReason };
   }
 
-  const lockedVersion = lockfile?.packages?.[`node_modules/${dependency.name}`]?.version
-    ?? lockfile?.dependencies?.[dependency.name]?.version;
-  if (parseVersion(lockedVersion)) {
-    return {
-      ...dependency,
-      packageSpec: `${dependency.name}@${lockedVersion}`,
-      resolvedFrom: "package-lock.json",
-    };
+  const locked = lockfile?.packages?.[`node_modules/${dependency.name}`]
+    ?? lockfile?.dependencies?.[dependency.name];
+  if (locked) return lockedDependency(dependency, locked, options);
+  if (options.requireLockedVersion) {
+    return { ...dependency, packageSpec: null, reason: "Missing an exact lockfile entry for a declared dependency." };
   }
 
   return {
@@ -331,6 +338,32 @@ function resolveProjectDependency(dependency, lockfile) {
       : dependency.name,
     resolvedFrom: "package.json",
   };
+}
+
+export function lockedDependency(dependency, entry, options = {}) {
+  const skip = (reason) => ({ ...dependency, packageSpec: null, resolvedFrom: "package-lock.json", reason });
+  if (entry.link) return skip("Workspace/local links are outside the registry-only trust boundary.");
+  if (!parseVersion(entry.version)) return skip("Lockfile entry has no supported exact registry version.");
+  try { parsePackageSpec(dependency.name); } catch (error) { return skip(error.message); }
+  if (entry.name && entry.name !== dependency.name) return skip("Aliased package names are outside the registry-only trust boundary.");
+  if (entry.resolved) {
+    try {
+      const resolved = new URL(entry.resolved);
+      const registry = new URL(options.registry ?? "https://registry.npmjs.org");
+      if (resolved.origin !== registry.origin || resolved.username || resolved.password) {
+        return skip("Lockfile resolves outside the configured registry; registry code would not be the installed code.");
+      }
+    } catch { return skip("Non-registry lockfile resolution is outside the registry-only trust boundary."); }
+  }
+  return { ...dependency, packageSpec: `${dependency.name}@${entry.version}`,
+    integrity: entry.integrity ?? null, resolvedFrom: "package-lock.json" };
+}
+
+// Equal names and versions can resolve to different bytes or sources. Never let
+// a reviewed public artifact hide an unsupported or differently pinned copy.
+export function lockedArtifactKey(name, entry) {
+  return JSON.stringify([name, entry.version ?? null, entry.resolved ?? null,
+    entry.integrity ?? null, entry.name ?? null, Boolean(entry.link)]);
 }
 
 function unsupportedDependencyReason(requested) {

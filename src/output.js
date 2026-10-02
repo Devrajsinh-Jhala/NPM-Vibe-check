@@ -1,3 +1,5 @@
+import { reportCoverage } from "./coverage.js";
+
 const SYMBOLS = {
   proceed: "✓",
   caution: "!",
@@ -23,7 +25,9 @@ export function renderDashboard(result, options = {}) {
   lines.push("");
   lines.push(...profileLines(result));
   lines.push(`Downloads: ${formatDownloads(result.stats.weeklyDownloads)}/week  Package age: ${formatDays(result.stats.packageAgeDays)}  Version age: ${formatDays(result.stats.versionAgeDays)}`);
-  lines.push(`Known advisories: ${result.stats.advisoryCount ? `${result.stats.advisoryCount} (OSV)` : "none found (OSV)"}`);
+  lines.push(`Known advisories: ${result.stats.advisoryStatus === "skipped" ? "skipped (--no-advisories)"
+    : result.stats.advisoryStatus === "unavailable" ? "unavailable (OSV lookup did not complete)"
+      : result.stats.advisoryCount ? `${result.stats.advisoryCount} (OSV)` : "none found (OSV)"}`);
   lines.push(`Install hooks: ${result.stats.lifecycleScripts.length ? result.stats.lifecycleScripts.map((script) => script.name).join(", ") : "none"}`);
   if (result.stats.publishScripts?.length) {
     lines.push(color.dim(
@@ -120,19 +124,18 @@ export function toAgentResult(report, options = {}) {
   return JSON.stringify(createAgentResult(report, options), null, 2);
 }
 
-// Bumped for 2.0.0: registry context moved to the non-scoring "info" severity,
-// project scans became transitive by default, and script-approvals joined the
-// kind enum. A consumer pinned to 1 would misread all three.
-export const SCHEMA_VERSION = 2;
+// v3 makes subject coverage mandatory and removes the misleading safety promise.
+export const SCHEMA_VERSION = 3;
 
 const AGENT_KINDS = new Set(["package-scan", "project-scan", "script-approvals"]);
 
 export function createAgentResult(report, options = {}) {
   const kind = AGENT_KINDS.has(options.kind) ? options.kind : "package-scan";
   const exitCode = Number(options.exitCode ?? 1);
-  const incomplete = exitCode === 1;
+  const coverage = reportCoverage(report, kind);
+  const incomplete = exitCode === 1 || !coverage.complete;
   const verdict = report?.verdict?.verdict ?? null;
-  const riskScore = Number.isFinite(Number(report?.verdict?.score))
+  const riskScore = report?.verdict?.score != null && Number.isFinite(Number(report.verdict.score))
     ? Number(report.verdict.score)
     : null;
 
@@ -144,7 +147,8 @@ export function createAgentResult(report, options = {}) {
     },
     kind,
     status: incomplete ? "incomplete" : "complete",
-    decision: agentDecision(verdict, riskScore, exitCode, incomplete),
+    decision: agentDecision(verdict, riskScore, incomplete ? 1 : exitCode, incomplete),
+    coverage,
     subject: kind === "project-scan" || kind === "script-approvals"
       ? {
           type: "project",
@@ -176,6 +180,8 @@ export function createAgentError(error, options = {}) {
     kind: "error",
     status: "error",
     decision: agentDecision(null, null, 1, true),
+    coverage: { scope: "unknown", complete: false, requested: 0, scanned: 0,
+      skipped: 0, failed: 1, reasons: [error instanceof Error ? error.message : String(error)] },
     error: {
       code: options.code ?? "operational_error",
       message: error instanceof Error ? error.message : String(error),
@@ -186,7 +192,7 @@ export function createAgentError(error, options = {}) {
 function agentDecision(verdict, riskScore, exitCode, incomplete) {
   const action = incomplete
     ? "retry"
-    : verdict === "proceed"
+    : verdict === "proceed" && exitCode === 0
       ? "continue"
       : verdict === "caution"
         ? "review"
@@ -198,7 +204,6 @@ function agentDecision(verdict, riskScore, exitCode, incomplete) {
     action,
     exitCode,
     mayContinue: action === "continue",
-    safeToExecute: action === "continue",
     requiresApproval: action === "review",
     requiresHumanReview: action === "review" || action === "retry",
     blocked: action === "stop",
@@ -276,7 +281,9 @@ export function renderScriptApprovals(report, options = {}) {
   }
 
   lines.push(color.dim("No install script was executed during this review."));
-  if (report.write?.written) {
+  if (report.write?.reason && report.errors.length) {
+    lines.push(color.red(report.write.reason));
+  } else if (report.write?.written) {
     lines.push(color.green(`Recorded ${report.write.count} decision(s) in allowScripts.`));
   } else if (summary.approve + summary.deny > 0) {
     lines.push(`Run again with --write to record ${summary.approve + summary.deny} unambiguous decision(s) in package.json.`);
@@ -360,7 +367,7 @@ export function renderScriptApprovalAnnotations(report) {
 export function renderProjectDashboard(scan, options = {}) {
   const color = createColor(Boolean(options.color));
   const verdict = scan.verdict.verdict;
-  const incomplete = scan.errors.length > 0;
+  const incomplete = scan.errors.length > 0 || scan.coverage?.complete === false || scan.skipped?.length > 0;
   const headline = incomplete
     ? color.red("Incomplete")
     : verdict === "proceed"
@@ -446,8 +453,8 @@ export function renderProjectDashboard(scan, options = {}) {
   }
 
   lines.push("", color.dim("No dependency or package code was executed during this project scan."));
-  if (scan.errors.length) {
-    lines.push(color.red("Action: fix scan errors before relying on the aggregate verdict."));
+  if (incomplete) {
+    lines.push(color.red("Action: coverage is incomplete. Resolve skipped dependencies or scan errors before continuing."));
   } else if (verdict === "proceed") {
     lines.push(color.green(`Action: no reviewable ${scan.project.transitive ? "dependency" : "direct dependency"} triggered Caution or Block.`));
   } else if (verdict === "caution") {
@@ -475,11 +482,14 @@ export function renderGitHubActionsAnnotations(scan) {
   for (const error of scan.errors) {
     lines.push(`::error title=${escapeWorkflowProperty(`npx-vibe: ${error.name}`)}::${escapeWorkflowMessage(error.message)}`);
   }
+  for (const entry of scan.skipped ?? []) {
+    lines.push(`::error title=${escapeWorkflowProperty(`npx-vibe coverage: ${entry.name}`)}::${escapeWorkflowMessage(entry.reason)}`);
+  }
   return lines.length ? `${lines.join("\n")}\n` : "";
 }
 
 export function renderProjectMarkdownSummary(scan) {
-  const title = `npx-vibe: ${scan.errors.length ? "Incomplete" : capitalize(scan.verdict.verdict)}`;
+  const title = `npx-vibe: ${scan.errors.length || scan.skipped?.length || scan.coverage?.complete === false ? "Incomplete" : capitalize(scan.verdict.verdict)}`;
   const lines = [
     `## ${title}`,
     "",
@@ -509,7 +519,11 @@ export function renderProjectMarkdownSummary(scan) {
   }
   lines.push("");
   if (scan.skipped.length) {
-    lines.push("Skipped non-registry dependencies are listed in the CLI and JSON output.", "");
+    lines.push("### Incomplete coverage", "");
+    for (const entry of scan.skipped) {
+      lines.push(`- ${markdownCell(entry.name)}: ${markdownCell(entry.reason)}`);
+    }
+    lines.push("");
   }
   lines.push("_A npx-vibe verdict is a review aid, not proof that a package is safe or malicious._", "");
   return lines.join("\n");
@@ -609,14 +623,18 @@ function reviewHistoryLines(history, color) {
 }
 
 function actionLine(result, color) {
-  const name = result.package?.name ?? "<package>";
+  const name = result.execution?.npmPackage ?? result.package?.name ?? "<package>";
+  const bin = result.execution?.bin;
+  const binOption = bin && bin !== result.package?.name?.split("/").pop() ? ` --bin ${bin}` : "";
   if (result.verdict.verdict === "proceed") {
-    return color.green(`Action: nothing blocking found. Run it with: npx-vibe run ${name}`);
+    return color.green(result.execution?.binError
+      ? "Action: nothing blocking found. No runnable binary was selected; this was a read-only scan."
+      : `Action: nothing blocking found. Run it with: npx-vibe run${binOption} ${name}`);
   }
   if (result.verdict.verdict === "caution") {
     return color.yellow("Action: read the evidence above before running this package.");
   }
-  return color.red(`Action: blocked. npx-vibe run ${name} --force overrides this deliberately.`);
+  return color.red(`Action: blocked. npx-vibe run --force${binOption} ${name} overrides this deliberately.`);
 }
 
 function colorSeverity(severity, color) {

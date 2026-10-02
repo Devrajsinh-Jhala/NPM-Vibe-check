@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      # Full semver only. The moving major tag (v2) that the GitHub Action uses
+      # Full semver only. A moving major tag is not a release and
       # is not a release and must not try to publish.
       - "v[0-9]+.[0-9]+.[0-9]+"
 
@@ -46,4 +46,4 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md --verify-tag

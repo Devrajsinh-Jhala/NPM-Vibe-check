@@ -76,8 +76,20 @@ try {
   const mcpMessages = mcp.stdout.trim().split("\n").map((line) => JSON.parse(line));
   const toolNames = mcpMessages.find((message) => message.id === 2)?.result?.tools?.map((tool) => tool.name);
   if (mcpMessages.find((message) => message.id === 1)?.result?.protocolVersion !== "2025-11-25" ||
-      !toolNames?.includes("scan_package") || !toolNames?.includes("scan_project")) {
+      !["scan_package", "scan_project", "approve_scripts", "list_providers"].every((name) => toolNames?.includes(name))) {
     throw new Error("Packed MCP handshake and tool-discovery smoke test failed.");
+  }
+  const mcpBinary = join(consumer, "node_modules", "npx-vibe", "bin", "npx-vibe-mcp.js");
+  const dedicated = spawnSync(process.execPath, [mcpBinary], {
+    cwd: consumer, encoding: "utf8", input: mcpInput, shell: false, windowsHide: true, timeout: 15000,
+  });
+  if (dedicated.status !== 0 || !dedicated.stdout.includes('"protocolVersion":"2025-11-25"')) {
+    throw new Error("Packed dedicated MCP binary failed to initialize.");
+  }
+  for (const filename of ["MAINTENANCE.md", "MIGRATING.md", "SECURITY.md", "CHANGELOG.md"]) {
+    if (!readFileSync(join(consumer, "node_modules", "npx-vibe", filename), "utf8").trim()) {
+      throw new Error(`Packed documentation is missing: ${filename}`);
+    }
   }
   const emptyProject = join(temporary, "empty-project");
   mkdirSync(emptyProject, { recursive: true });
@@ -88,12 +100,13 @@ try {
   }));
   const projectScan = run(process.execPath, [cli, "--project", emptyProject, "--no-history"], consumer).stdout;
   if (!projectScan.includes("Scanned: 0/0 direct dependencies")
-      || !projectScan.includes("No package-lock.json found")) {
+      || projectScan.includes("Incomplete")) {
     throw new Error("Packed CLI project-scan smoke test failed.");
   }
   const agentScan = run(process.execPath, [cli, "--agent", "--project", emptyProject], consumer);
   const agentPayload = JSON.parse(agentScan.stdout);
-  if (agentPayload.schemaVersion !== 2 || agentPayload.kind !== "project-scan") {
+  if (agentPayload.schemaVersion !== 3 || agentPayload.kind !== "project-scan"
+      || !agentPayload.coverage.complete || Object.hasOwn(agentPayload.decision, "safeToExecute")) {
     throw new Error("Packed CLI agent-contract smoke test failed.");
   }
 

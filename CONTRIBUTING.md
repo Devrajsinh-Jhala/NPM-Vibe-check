@@ -2,6 +2,8 @@
 
 Thanks for helping make package execution safer and less noisy.
 
+Version 3.0.0 is the final planned release, and active maintenance has ended. Issues and pull requests may not be reviewed or merged. The instructions below remain useful for independent forks; see [MAINTENANCE.md](MAINTENANCE.md) for the support boundary and fork guidance.
+
 ## Development
 
 Requirements: Node.js 20 or newer.

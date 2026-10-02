@@ -167,6 +167,27 @@ test("MCP scan failures are tool errors with fail-closed structured output", asy
   assert.equal(response.result.structuredContent.error.code, "package_scan_failed");
 });
 
+test("MCP incomplete coverage is a tool error even for a clean scanned subset", async () => {
+  const server = new NpxVibeMcpServer({
+    version: "3.0.0",
+    scanProject: async () => ({
+      project: { name: "partial", transitive: true },
+      verdict: { verdict: "proceed", score: 0 },
+      summary: { discovered: 2, scanned: 1, skipped: 1, errors: 0 },
+      packages: [packageResult("proceed", 0)],
+      skipped: [{ name: "local", reason: "Unsupported workspace source" }],
+      errors: [],
+    }),
+  });
+  const response = await server.handleMessage({ jsonrpc: "2.0", id: 30, method: "tools/call",
+    params: { name: "scan_project", arguments: { path: "." } } });
+  assert.equal(response.result.isError, true);
+  assert.equal(response.result.structuredContent.schemaVersion, 3);
+  assert.equal(response.result.structuredContent.coverage.complete, false);
+  assert.equal(response.result.structuredContent.decision.action, "retry");
+  assert.equal(response.result.structuredContent.decision.exitCode, 1);
+});
+
 test("MCP rejects unknown tools and invalid arguments at the protocol layer", async () => {
   const server = new NpxVibeMcpServer({ version: "1.5.0" });
   const unknown = await server.handleMessage({
@@ -303,7 +324,7 @@ test("MCP approve_scripts returns the approval decision without executing anythi
 
   const payload = response.result.structuredContent;
   assert.equal(response.result.isError, false);
-  assert.equal(payload.schemaVersion, 2);
+  assert.equal(payload.schemaVersion, 3);
   assert.equal(payload.kind, "script-approvals");
   assert.equal(payload.decision.action, "review");
   assert.equal(payload.decision.exitCode, 2);

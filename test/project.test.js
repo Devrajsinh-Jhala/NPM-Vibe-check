@@ -7,13 +7,16 @@ import {
   collectProjectDependencies,
   loadProjectManifest,
   projectExitCode,
-  scanProject,
+  scanProject as scanProjectImpl,
 } from "../src/project.js";
 import {
   renderGitHubActionsAnnotations,
   renderProjectDashboard,
   renderProjectMarkdownSummary,
 } from "../src/output.js";
+
+const scanProject = (input, options, reviewer) => scanProjectImpl(input,
+  { downloadsCache: new Map(), advisoriesCache: new Map(), ...options }, reviewer);
 
 function makeProject() {
   const directory = mkdtempSync(join(tmpdir(), "npx-vibe-project-"));
@@ -37,7 +40,7 @@ function makeProject() {
       "": { name: "demo-app", version: "1.0.0" },
       "node_modules/alpha": { version: "1.4.2" },
       "node_modules/beta": { version: "2.0.7" },
-      "node_modules/gamma": { version: "3.1.0" },
+      "node_modules/gamma": { version: "3.1.0", dev: true },
       "node_modules/local": { version: "9.9.9", resolved: "file:../local" },
     },
   }));
@@ -93,7 +96,9 @@ test("project scan aggregates verdicts, skips non-registry specs, and never requ
   assert.equal(scan.verdict.verdict, "caution");
   assert.equal(scan.summary.scanned, 2);
   assert.equal(scan.summary.skipped, 1);
-  assert.equal(projectExitCode(scan), 2);
+  assert.equal(projectExitCode(scan), 1);
+  assert.equal(scan.coverage.complete, false);
+  assert.equal(scan.coverage.skipped, 1);
   assert.ok(calls.every((call) => call.options.check && call.options.githubMetadata === false));
   assert.deepEqual(calls.map((call) => call.spec).sort(), ["alpha@1.4.2", "beta@2.0.7"]);
 });
@@ -178,15 +183,15 @@ test("transitive scanning walks the lockfile tree and honours dev flags", () => 
   assert.deepEqual(direct.map((dependency) => dependency.packageSpec), ["alpha@1.4.0"]);
 
   const transitive = collectProjectDependencies(project, { transitive: true });
-  assert.deepEqual(transitive.map((dependency) => dependency.packageSpec), [
+  assert.deepEqual(transitive.filter((dependency) => dependency.packageSpec).map((dependency) => dependency.packageSpec), [
     "alpha@1.4.0",
     "@scope/gamma@0.2.0",
     "beta@2.0.0",
     "beta@3.1.0",
   ]);
-  // Workspace links and git resolutions stay outside the registry-only boundary.
-  assert.equal(transitive.some((dependency) => dependency.name === "linked"), false);
-  assert.equal(transitive.some((dependency) => dependency.name === "from-git"), false);
+  // Unreviewable resolutions stay visible so partial coverage cannot pass.
+  assert.equal(transitive.find((dependency) => dependency.name === "linked").packageSpec, null);
+  assert.equal(transitive.find((dependency) => dependency.name === "from-git").packageSpec, null);
   assert.equal(transitive.some((dependency) => dependency.name === "tooling"), false);
 
   const withDev = collectProjectDependencies(project, { transitive: true, includeDev: true });
@@ -209,12 +214,74 @@ test("transitive scanning requires a lockfile", async () => {
     /needs a package-lock\.json/
   );
 
-  // ...but the v2 default degrades to direct dependencies and says so, rather
-  // than failing a scan on a freshly cloned repository.
-  const fallback = await scanProject(directory, { transitive: true }, async () => ({
+  await assert.rejects(
+    () => scanProject(directory, { transitive: true }, async () => ({ result: {} })),
+    /needs a package-lock\.json/
+  );
+  // Manifest-only review must now be chosen explicitly.
+  const direct = await scanProject(directory, { transitive: false }, async () => ({
     result: { verdict: { verdict: "proceed", score: 0 }, findings: [], package: { name: "alpha" } },
   }));
-  assert.equal(fallback.project.transitive, false);
-  assert.equal(fallback.project.transitiveFallback, true);
-  assert.equal(fallback.summary.discovered, 1);
+  assert.equal(direct.project.transitive, false);
+  assert.equal(direct.project.transitiveFallback, false);
+  assert.equal(direct.coverage.scope, "direct-dependencies");
+  assert.equal(direct.coverage.complete, true);
+  assert.equal(direct.summary.discovered, 1);
+});
+
+test("a package limit never turns a partially reviewed tree into a pass", async () => {
+  const scan = await scanProject(makeProject(), { projectMaxPackages: 1, advisories: false },
+    async (spec) => reviewedResult(spec));
+  assert.equal(scan.verdict.verdict, "proceed");
+  assert.equal(projectExitCode(scan), 1);
+  assert.equal(scan.coverage.complete, false);
+  assert.equal(scan.coverage.scanned, 1);
+  assert.equal(scan.coverage.skipped, 2);
+  assert.match(renderProjectDashboard(scan), /coverage is incomplete/);
+  assert.match(renderProjectMarkdownSummary(scan), /Incomplete/);
+});
+
+test("foreign tarballs are never scanned as though they were registry code", () => {
+  const dependencies = collectProjectDependencies({
+    manifest: { dependencies: { alpha: "^1.0.0" } },
+    lockfile: { packages: { "node_modules/alpha": {
+      version: "1.0.0", resolved: "https://attacker.example/alpha.tgz",
+    } } },
+  }, { transitive: true });
+  assert.equal(dependencies[0].packageSpec, null);
+  assert.match(dependencies[0].reason, /would not be the installed code/);
+});
+
+test("locked integrity is forwarded to the package reviewer", async () => {
+  const directory = makeProject();
+  const lockPath = join(directory, "package-lock.json");
+  const integrity = "sha512-review-this-exact-content";
+  writeFileSync(lockPath, JSON.stringify({ lockfileVersion: 3, packages: {
+    "": {}, "node_modules/alpha": { version: "1.4.2", integrity },
+    "node_modules/beta": { version: "2.0.7" },
+  } }));
+  let checked = false;
+  await scanProject(directory, { advisories: false }, async (spec, options) => {
+    if (spec.startsWith("alpha@")) { assert.equal(options.lockedIntegrity, integrity); checked = true; }
+    return reviewedResult(spec);
+  });
+  assert.equal(checked, true);
+});
+
+test("equal versions with different sources are not deduplicated out of coverage", () => {
+  const deps = collectProjectDependencies({
+    manifest: { dependencies: { alpha: "1.0.0" } },
+    lockfile: { packages: {
+      "node_modules/alpha": { version: "1.0.0", resolved: "https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz" },
+      "node_modules/other/node_modules/alpha": { version: "1.0.0", resolved: "https://untrusted.example/alpha.tgz" },
+    } },
+  }, { transitive: true });
+  assert.equal(deps.length, 2);
+  assert.equal(deps.filter((entry) => entry.packageSpec === null).length, 1);
+});
+
+test("malformed locks fail even when direct-only mode is requested", async () => {
+  const dir = makeProject();
+  writeFileSync(join(dir, "package-lock.json"), "{invalid}");
+  await assert.rejects(() => scanProject(dir, { transitive: false }, reviewedResult), /Could not read package-lock/);
 });

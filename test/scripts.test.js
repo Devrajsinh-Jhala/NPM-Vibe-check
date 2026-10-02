@@ -58,15 +58,14 @@ function lockProject(overrides = {}) {
 
 test("pending packages come from lockfile install-script flags", () => {
   const pending = collectPendingScriptPackages(lockProject());
-  assert.deepEqual(pending.map((entry) => entry.packageSpec), [
+  assert.deepEqual(pending.filter((entry) => entry.packageSpec).map((entry) => entry.packageSpec), [
     "binary-fetcher@1.0.4",
     "native-thing@2.1.0",
   ]);
-  // A package with no install script, a workspace link, and a git resolution are
-  // all outside the question npm 12 asks.
+  // Unsupported install-script sources are visible and fail closed in the review.
   assert.equal(pending.some((entry) => entry.name === "plain-lib"), false);
-  assert.equal(pending.some((entry) => entry.name === "linked-thing"), false);
-  assert.equal(pending.some((entry) => entry.name === "from-git"), false);
+  assert.equal(pending.find((entry) => entry.name === "linked-thing").packageSpec, null);
+  assert.equal(pending.find((entry) => entry.name === "from-git").packageSpec, null);
   assert.equal(pending.find((entry) => entry.name === "binary-fetcher").dev, true);
 });
 
@@ -100,6 +99,30 @@ test("credential access in an install script is a deny", () => {
   assert.equal(decision.evidence[0].line, 4);
 });
 
+test("existing denies cannot be bypassed by pinned allows or permission writes", () => {
+  const allow = readAllowScripts({ allowScripts: { native: false, "native@1.0.0": true } });
+  assert.equal(resolveAllowState(allow, "native", "1.0.0"), "denied");
+  const directory = mkdtempSync(join(tmpdir(), "npx-vibe-deny-"));
+  const path = join(directory, "package.json");
+  writeFileSync(path, JSON.stringify({ allowScripts: { native: false, "other@1.0.0": false } }));
+  const result = applyAllowScripts(path, new Map([["native@1.0.0", true], ["other@1.0.0", true]]));
+  assert.equal(result.written, false);
+  const permissions = JSON.parse(readFileSync(path)).allowScripts;
+  assert.equal(permissions.native, false);
+  assert.equal(permissions["other@1.0.0"], false);
+  assert.equal(Object.hasOwn(permissions, "native@1.0.0"), false);
+});
+
+test("missing resolved metadata needs review rather than unenforceable pinned approval", async () => {
+  const project = lockProject();
+  project.lockfile.packages = { "node_modules/native-thing": { version: "2.1.0", hasInstallScript: true } };
+  const report = await reviewScriptApprovals(project, {}, async () => ({ result: scanResult({
+    scripts: [{ name: "install", command: "node-gyp rebuild" }],
+  }) }));
+  assert.equal(report.packages[0].decision, "review");
+  assert.match(report.packages[0].reasons[0], /no resolved URL/);
+});
+
 test("a pure local build toolchain is approved", () => {
   const decision = classifyInstallScripts(scanResult({
     scripts: [{ name: "install", command: "node-gyp rebuild --release" }],
@@ -117,9 +140,9 @@ test("a build command that can also download a binary is not approved", () => {
   assert.equal(decision.decision, "review");
 });
 
-test("an implicit node-gyp rebuild with no declared script is approved", () => {
+test("an implicit native build without an inspected script requires review", () => {
   const decision = classifyInstallScripts(scanResult({ scripts: [] }));
-  assert.equal(decision.decision, "approve");
+  assert.equal(decision.decision, "review");
   assert.match(decision.reasons[0], /binding\.gyp/);
 });
 
@@ -167,7 +190,7 @@ test("only unambiguous decisions are written to allowScripts", async () => {
   };
 
   const patch = buildAllowScriptsPatch(report);
-  assert.deepEqual([...patch.entries()], [["good", true], ["bad", false]]);
+  assert.deepEqual([...patch.entries()], [["good@1.0.0", true], ["bad@2.0.0", false]]);
   assert.equal(patch.has("unclear"), false, "review packages are never auto-written");
 
   const write = applyAllowScripts(manifestPath, patch);
@@ -176,8 +199,8 @@ test("only unambiguous decisions are written to allowScripts", async () => {
   const written = JSON.parse(readFileSync(manifestPath, "utf8"));
   assert.deepEqual(written.allowScripts, {
     "already-there": true,
-    bad: false,
-    good: true,
+    "bad@2.0.0": false,
+    "good@1.0.0": true,
   });
   assert.equal(written.name, "app", "the rest of the manifest is preserved");
 
@@ -208,12 +231,28 @@ test("approve-scripts reviews only pending packages and requires a lockfile", as
   assert.deepEqual(seen, ["native-thing@2.1.0"], "an allowed package is not re-reviewed");
   assert.equal(report.summary.alreadyAllowed, 1);
   assert.equal(report.summary.approve, 1);
-  assert.equal(scriptApprovalExitCode(report), 0);
+  assert.equal(scriptApprovalExitCode(report), 1);
+  assert.equal(report.coverage.complete, false);
 
   await assert.rejects(
     () => reviewScriptApprovals({ ...lockProject(), lockfile: null }, {}, async () => ({})),
     /needs a package-lock\.json/
   );
+});
+
+test("native tool names inside shell code cannot earn automatic approval", () => {
+  for (const command of ["echo node-gyp rebuild", "node-gyp rebuild $(node payload.js)",
+    "node-gyp rebuild > /tmp/output", "node-gyp rebuild & node payload.js",
+    "node-gyp rebuild\nnode payload.js", "node-gyp rebuild; echo node-gyp rebuild"]) {
+    assert.equal(classifyInstallScripts(scanResult({ scripts: [{ name: "install", command }] })).decision,
+      "review", command);
+  }
+});
+
+test("partial selected source cannot automatically authorise install scripts", () => {
+  const result = scanResult({ scripts: [{ name: "install", command: "node-gyp rebuild" }] });
+  result.stats.truncatedFileCount = 1;
+  assert.equal(classifyInstallScripts(result).decision, "review");
 });
 
 test("the approvals report carries a verdict the agent contract can read", async () => {

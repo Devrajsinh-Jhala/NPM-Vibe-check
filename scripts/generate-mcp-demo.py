@@ -82,8 +82,8 @@ def draw_request(draw, stage):
     draw.text((88, 202), "MCP CLIENT", font=UI_16, fill="#6fdab7")
     events = [
         ("01", "initialize", "Protocol 2025-11-25 negotiated"),
-        ("02", "tools/list", "3 read-only tools discovered"),
-        ("03", "scan_package", '{ "package": "esbuild" }'),
+        ("02", "tools/list", "4 read-only tools discovered"),
+        ("03", "scan_package", '{ "package": "esbuild@0.28.2" }'),
     ]
     for index, (number, label, detail) in enumerate(events):
         y = 235 + index * 78
@@ -93,22 +93,24 @@ def draw_request(draw, stage):
         draw.text((145, y), label, font=UI_20_BOLD, fill="#eef5f6" if active else "#768792")
         draw.text((145, y + 29), detail, font=UI_16, fill="#9cacb5" if active else "#53636e")
 
-    pill(draw, (88, 492, 248, 532), "scan_package", stage >= 2)
-    pill(draw, (258, 492, 414, 532), "scan_project", stage >= 2)
-    pill(draw, (424, 492, 552, 532), "list_models", stage >= 2)
-    draw.text((88, 555), "No package code executed", font=UI_18, fill="#78d6b8" if stage >= 3 else "#53636e")
+    pill(draw, (88, 488, 298, 528), "scan_package", stage >= 2)
+    pill(draw, (310, 488, 556, 528), "scan_project", stage >= 2)
+    pill(draw, (88, 537, 298, 577), "approve_scripts", stage >= 2)
+    pill(draw, (310, 537, 556, 577), "list_providers", stage >= 2)
+    draw.text((88, 583), "Illustrative · no package code executed", font=UI_16, fill="#78d6b8" if stage >= 3 else "#53636e")
 
 
 def draw_result(draw, visible_lines, show_gate):
     draw.rounded_rectangle((600, 202, 1112, 557), radius=17, fill="#111e29", outline="#2a3b47", width=2)
-    draw.text((624, 223), "STRUCTURED RESULT", font=UI_16, fill="#70d7b5")
+    draw.text((624, 223), "STRUCTURED RESULT · EXCERPT", font=UI_16, fill="#70d7b5")
     lines = [
         ('{', "#d8e2e8"),
-        ('  "schemaVersion": 1,', "#d8e2e8"),
+        ('  "schemaVersion": 3,', "#d8e2e8"),
         ('  "status": "complete",', "#d8e2e8"),
+        ('  "coverage": { "complete": true },', "#70d7b5"),
         ('  "decision": {', "#d8e2e8"),
         ('    "verdict": "caution",', "#f4bd50"),
-        ('    "riskScore": 43,', "#f4bd50"),
+        ('    "riskScore": 42,', "#f4bd50"),
         ('    "action": "review",', "#f4bd50"),
         ('    "mayContinue": false', "#f4bd50"),
         ('  }', "#d8e2e8"),
@@ -139,7 +141,7 @@ def main():
         (2, 3, False, 700),
         (3, 5, False, 800),
         (3, 8, False, 650),
-        (3, 10, True, 2400),
+        (3, 11, True, 2400),
     ]
     frames = [make_frame(*state[:3]) for state in states]
     durations = [state[3] for state in states]

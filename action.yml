@@ -44,7 +44,7 @@ inputs:
   version:
     description: "npx-vibe version range to run. Pin this for reproducible builds."
     required: false
-    default: "2"
+    default: "3.0.0"
 
 outputs:
   verdict:
@@ -100,13 +100,12 @@ runs:
         esac
 
         # Install the exact requested version into a scratch directory and run it
-        # directly. `npx npx-vibe@2` resolves a locally installed binary of the
+        # directly. `npx npx-vibe@3` resolves a locally installed binary of the
         # same name first, so a project that pins npx-vibe as a devDependency --
         # or this repository, which *is* npx-vibe -- would silently run something
         # other than what was asked for. A security tool has to run the version
         # you named.
-        tool_dir=".npx-vibe-runner"
-        rm -rf "$tool_dir"
+        tool_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/npx-vibe.XXXXXX")" || exit 1
         trap 'rm -rf "$tool_dir"' EXIT
 
         npm install --prefix "$tool_dir" --no-save --no-audit --no-fund           --ignore-scripts --loglevel=error "npx-vibe@${VIBE_VERSION}"
@@ -123,7 +122,7 @@ runs:
 
         echo "npx-vibe $(node "$cli" --version)"
         echo "Running: npx-vibe ${args[*]}"
-        node "$cli" "${args[@]}"
+        NPX_VIBE_AI=off NPX_VIBE_HISTORY=off node "$cli" "${args[@]}"
         code=$?
 
         case "$code" in
@@ -137,7 +136,7 @@ runs:
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
 
         # An incomplete scan is never read as safe, whatever fail-on says.
-        if [ "$code" = "1" ]; then
+        if [ "$verdict" = "error" ]; then
           echo "::error::npx-vibe could not complete the review. Not treating this as a pass."
           exit 1
         fi

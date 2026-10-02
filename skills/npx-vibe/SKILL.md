@@ -25,16 +25,20 @@ Use the CLI when the MCP server is unavailable.
 For one package:
 
 ```bash
-npx --yes npx-vibe@latest --agent <package-spec>
+npx --yes npx-vibe@3.0.0 --agent <package-spec>
 ```
 
-For the current project's direct registry dependencies:
+For the current project's locked dependency tree:
 
 ```bash
-npx --yes npx-vibe@latest --agent --project .
+npx --yes npx-vibe@3.0.0 project --agent
 ```
 
 Add `--include-dev` only when development dependencies are in scope. Project scans cover the whole lockfile tree by default; add `--direct-only` for the narrower, faster check.
+
+Nonempty default project scans require a usable npm lockfile packages map. Missing lockfiles, unsupported sources, package limits, and failed reviews must not be treated as a passing whole-project check. Do not narrow the requested scope just to get a passing result. Generate a lockfile with `npm install --package-lock-only --ignore-scripts` only when that local change is already authorized.
+
+For read-only script recommendations, use `npx --yes npx-vibe@3.0.0 approve-scripts --agent`. Agent mode never writes permissions. Human workflows using `--write` record exact-version permissions only.
 
 Scanning never executes a package. Only `npx-vibe run <spec>` does, and it is never the right command for an automated check.
 
@@ -49,14 +53,14 @@ Read `structuredContent` from an MCP result, or parse CLI stdout as JSON, and us
 - `stop`: Do not install or execute the package. Explain the Block verdict and source evidence.
 - `retry`: Treat the scan as incomplete. Report the operational error and do not infer safety from partial results.
 
-Also require `schemaVersion === 2`, `status === "complete"`, and `decision.mayContinue === true` before continuing automatically. An MCP result with `isError: true` is incomplete and must be treated as `retry`, even when partial details are present.
+Also require `schemaVersion === 3`, `status === "complete"`, `coverage.complete === true`, and `decision.action === "continue"` before continuing automatically. Coverage counts subjects in the requested scope, not every source file. The removed `safeToExecute` field is not a safety guarantee to reconstruct. An MCP result with `isError: true` must be treated as `retry`, even when partial details are present.
 
 ## Use AI only when requested
 
 The default heuristic scan needs no model or API key. Enable AI only when the user explicitly asks for it or an established workflow requires it:
 
 ```bash
-npx --yes npx-vibe@latest --agent --ai online --provider <provider> <package-spec>
+npx --yes npx-vibe@3.0.0 --agent --ai online --provider <provider> --model <model-id> <package-spec>
 ```
 
 Use a provider-specific environment variable. Never place API keys in generated commands, logs, summaries, or chat output.
@@ -64,3 +68,7 @@ Use a provider-specific environment variable. Never place API keys in generated 
 ## Present the result
 
 Report the package and resolved version, verdict, risk score, required action, and the most important file-and-line evidence. State that no package code was executed during the preflight. Do not describe Proceed as proof of safety.
+
+## Maintenance boundary
+
+3.0.0 is the final planned release. No further compatibility or security patches are scheduled. External registries, advisory services, and model APIs can change; disclose this limitation when proposing long-term security-critical adoption.

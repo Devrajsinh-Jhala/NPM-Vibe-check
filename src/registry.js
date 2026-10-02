@@ -27,11 +27,12 @@ export async function loadPackageSnapshot(spec, options = {}) {
       }));
   const profile = await buildPackageProfile(packument, manifest, version, options);
   const advisoryKey = `${spec.name}@${version}`;
-  const advisories = options.advisoriesCache?.has(advisoryKey)
-    ? options.advisoriesCache.get(advisoryKey)
-    : options.advisories === false
-      ? []
-      : (await fetchAdvisories([{ name: spec.name, version }], options).catch(() => new Map())).get(advisoryKey) ?? [];
+  const advisoryResults = options.advisories === false ? new Map()
+    : options.advisoriesCache instanceof Map ? options.advisoriesCache
+      : await fetchAdvisories([{ name: spec.name, version }], options).catch(() => new Map());
+  const advisories = advisoryResults.get(advisoryKey) ?? [];
+  const advisoryStatus = options.advisories === false ? "skipped"
+    : advisoryResults.has(advisoryKey) ? "checked" : "unavailable";
 
   return {
     spec,
@@ -48,6 +49,7 @@ export async function loadPackageSnapshot(spec, options = {}) {
     versionPublishedAt: packument.time?.[version] ?? null,
     profile,
     advisories,
+    advisoryStatus,
   };
 }
 

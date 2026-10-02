@@ -29,8 +29,8 @@ The workflow lives at `.github/workflows/release.yml` and requests only `content
 4. Create and push the matching tag:
 
    ```bash
-   git tag v2.1.2
-   git push origin v2.1.2
+   git tag v3.0.0
+   git push origin v3.0.0
    ```
 
 The release workflow verifies that the tag matches `package.json`, installs and tests the packed artifact, publishes with npm provenance, and creates a GitHub Release.
@@ -41,8 +41,8 @@ If trusted publishing is not configured, use the manual fallback after authentic
 npm login
 npm whoami
 npm publish --access public
-git tag v2.1.2
-git push origin v2.1.2
+git tag v3.0.0
+git push origin v3.0.0
 ```
 
 The tag workflow checks the registry first. When the matching version already exists, it skips the duplicate publish and creates only the GitHub Release.
@@ -66,3 +66,7 @@ Verify the active entry and matching npm package version:
 curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Devrajsinh-Jhala%2Fnpx-vibe"
 npm view npx-vibe version mcpName
 ```
+
+## Final-release handoff
+
+Version 3.0.0 is the final planned release. Verify the published artifact, Action, registry entry, and landing page before announcing completion. Link the migration and maintenance policies in the release notes. Do not promise future model compatibility, dependency-service availability, security patches, or issue response times. Leave existing versions available; repository archiving is a separate owner decision.

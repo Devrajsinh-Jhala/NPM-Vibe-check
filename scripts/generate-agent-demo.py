@@ -78,7 +78,7 @@ def base_frame():
 def draw_command(draw, typed):
     draw.text((88, 194), "$", font=MONO_20_BOLD, fill="#43d3a3")
     draw.text((112, 194), typed, font=MONO_19, fill="#eef4f7")
-    if len(typed) < len("npx --yes npx-vibe@latest --agent esbuild"):
+    if len(typed) < len("npx --yes npx-vibe@3.0.0 --agent esbuild@0.28.2"):
         x = 112 + draw.textlength(typed, font=MONO_19) + 3
         draw.rectangle((x, 198, x + 9, 222), fill="#8ea0aa")
 
@@ -93,12 +93,13 @@ def draw_step(draw, y, index, label, detail, active=True):
 
 def draw_json(draw, visible):
     draw.rounded_rectangle((720, 194, 1112, 501), radius=16, fill="#111e29", outline="#2a3b47", width=2)
-    draw.text((744, 216), "VERSIONED JSON", font=UI_18, fill="#70d7b5")
+    draw.text((744, 216), "SCHEMA 3 · JSON EXCERPT", font=UI_18, fill="#70d7b5")
     lines = [
         ('{', "#d8e2e8"),
-        ('  "schemaVersion": 1,', "#d8e2e8"),
+        ('  "schemaVersion": 3,', "#d8e2e8"),
         ('  "kind": "package-scan",', "#d8e2e8"),
         ('  "status": "complete",', "#d8e2e8"),
+        ('  "coverage": { "complete": true },', "#70d7b5"),
         ('  "decision": {', "#d8e2e8"),
         ('    "action": "review",', "#f4bd50"),
         ('    "requiresHumanReview": true', "#f4bd50"),
@@ -106,7 +107,7 @@ def draw_json(draw, visible):
         ('}', "#d8e2e8"),
     ]
     for line_index, (line, color) in enumerate(lines[:visible]):
-        draw.text((744, 252 + line_index * 25), line, font=MONO_18, fill=color)
+        draw.text((744, 252 + line_index * 23), line, font=MONO_18, fill=color)
 
 
 def draw_agent_action(draw, action):
@@ -121,14 +122,14 @@ def draw_agent_action(draw, action):
 def make_frame(command_chars, visible_steps, json_lines, show_action):
     image = base_frame()
     draw = ImageDraw.Draw(image)
-    command = "npx --yes npx-vibe@latest --agent esbuild"
+    command = "npx --yes npx-vibe@3.0.0 --agent esbuild@0.28.2"
     draw_command(draw, command[:command_chars])
 
     steps = [
-        ("RESOLVE", "esbuild@0.28.1 from the npm registry"),
+        ("RESOLVE", "esbuild@0.28.2 from the npm registry"),
         ("VERIFY", "sha512 integrity metadata matched"),
         ("INSPECT", "3 selected files · no package code executed"),
-        ("DECIDE", "Caution · risk 43/100"),
+        ("DECIDE", "Caution · risk 42/100"),
     ]
     for step_index, (label, detail) in enumerate(steps):
         draw_step(draw, 254 + step_index * 70, f"0{step_index + 1}", label, detail, step_index < visible_steps)
@@ -140,7 +141,7 @@ def make_frame(command_chars, visible_steps, json_lines, show_action):
 
 def main():
     ASSETS.mkdir(parents=True, exist_ok=True)
-    command_length = len("npx --yes npx-vibe@latest --agent esbuild")
+    command_length = len("npx --yes npx-vibe@3.0.0 --agent esbuild@0.28.2")
     states = [
         (0, 0, 0, False, 450),
         (14, 0, 0, False, 350),
@@ -149,7 +150,7 @@ def main():
         (command_length, 2, 2, False, 650),
         (command_length, 3, 4, False, 650),
         (command_length, 4, 7, False, 750),
-        (command_length, 4, 9, True, 2300),
+        (command_length, 4, 10, True, 2300),
     ]
     frames = [make_frame(*state[:4]) for state in states]
     durations = [state[4] for state in states]

@@ -1,4 +1,4 @@
-import { createAgentError, createAgentResult } from "./output.js";
+import { createAgentError, createAgentResult, SCHEMA_VERSION } from "./output.js";
 import { parseArgs, packageVersion, reviewPackage } from "./cli.js";
 import { loadProjectManifest, projectExitCode, scanProject } from "./project.js";
 import { reviewScriptApprovals, scriptApprovalExitCode } from "./scripts.js";
@@ -35,7 +35,7 @@ const COMMON_AI_PROPERTIES = {
   model: {
     type: "string",
     minLength: 1,
-    description: "Provider model identifier. Required when ai is not off, because no model catalog is bundled.",
+    description: "Exact provider model identifier, required for online review. Ollama may use its configured local model. No online model catalog is bundled.",
   },
 };
 
@@ -43,7 +43,7 @@ const AGENT_OUTPUT_SCHEMA = {
   $schema: JSON_SCHEMA,
   type: "object",
   properties: {
-    schemaVersion: { type: "integer", const: 2 },
+    schemaVersion: { type: "integer", const: SCHEMA_VERSION },
     tool: {
       type: "object",
       properties: {
@@ -62,7 +62,6 @@ const AGENT_OUTPUT_SCHEMA = {
         action: { type: "string", enum: ["continue", "review", "stop", "retry"] },
         exitCode: { type: "integer" },
         mayContinue: { type: "boolean" },
-        safeToExecute: { type: "boolean" },
         requiresApproval: { type: "boolean" },
         requiresHumanReview: { type: "boolean" },
         blocked: { type: "boolean" },
@@ -74,7 +73,6 @@ const AGENT_OUTPUT_SCHEMA = {
         "action",
         "exitCode",
         "mayContinue",
-        "safeToExecute",
         "requiresApproval",
         "requiresHumanReview",
         "blocked",
@@ -82,10 +80,20 @@ const AGENT_OUTPUT_SCHEMA = {
       ],
     },
     subject: { type: "object" },
+    coverage: {
+      type: "object",
+      properties: {
+        scope: { type: "string" }, complete: { type: "boolean" },
+        requested: { type: "integer", minimum: 0 }, scanned: { type: "integer", minimum: 0 },
+        skipped: { type: "integer", minimum: 0 }, failed: { type: "integer", minimum: 0 },
+        reasons: { type: "array", items: { type: "string" } },
+      },
+      required: ["scope", "complete", "requested", "scanned", "skipped", "failed", "reasons"],
+    },
     report: { type: "object" },
     error: { type: "object" },
   },
-  required: ["schemaVersion", "tool", "kind", "status", "decision"],
+  required: ["schemaVersion", "tool", "kind", "status", "decision", "coverage"],
 };
 
 const TOOL_DEFINITIONS = [
@@ -114,7 +122,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "scan_project",
     title: "Scan project dependencies",
-    description: "Inspect public-registry dependencies from package.json and package-lock.json without installing or executing them. Walks the whole installed tree by default; set directOnly for package.json dependencies alone. Use after dependency or lockfile changes and before installation.",
+    description: "Inspect registry dependencies without installing or executing them. Default tree reviews require an npm lockfile packages map; directOnly explicitly narrows scope. Skipped packages or limits make coverage incomplete: retry, never continue. Use after dependency or lockfile changes and before installation.",
     inputSchema: {
       $schema: JSON_SCHEMA,
       type: "object",
@@ -211,7 +219,7 @@ const TOOL_DEFINITIONS = [
       $schema: JSON_SCHEMA,
       type: "object",
       properties: {
-        schemaVersion: { type: "integer", const: 2 },
+        schemaVersion: { type: "integer", const: SCHEMA_VERSION },
         tool: { type: "object" },
         providers: { type: "array", items: { type: "object" } },
       },
@@ -407,7 +415,7 @@ export class NpxVibeMcpServer {
 
   providerCatalog() {
     return {
-      schemaVersion: 2,
+      schemaVersion: SCHEMA_VERSION,
       tool: { name: "npx-vibe", version: this.version },
       providers: providerCatalog(),
     };
@@ -548,7 +556,7 @@ function toolResult(payload, isError = false) {
   return {
     content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
     structuredContent: payload,
-    isError,
+    isError: isError || payload.status === "incomplete" || payload.status === "error",
   };
 }
 

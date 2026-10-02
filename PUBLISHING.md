@@ -1,58 +1,25 @@
-# Publishing npx-vibe
+# Publishing the final release
 
-This repository publishes two surfaces:
+Version 3.0.0 is the final planned release. Do not reuse published npm or MCP Registry versions.
 
-1. the `npx-vibe` npm package;
-2. the static landing page from `site/` to the `gh-pages` branch.
+## Package and registry
 
-## Release checklist
+Follow [RELEASING.md](RELEASING.md) for the trusted GitHub Actions publishing workflow, verification, and the separate MCP Registry publication. Package metadata, server metadata, documentation, and demos must agree on the version and schema.
 
-1. Confirm the working tree contains only intended changes.
-2. Update `CHANGELOG.md` and the version in `package.json`.
-3. Run the complete local verification:
+A passkey is not a six-digit authenticator OTP. Prefer the established trusted publishing workflow; for a manual publish, use npm's current browser authentication flow rather than repeatedly guessing OTPs.
 
-```powershell
-npm run verify
-npm pack --dry-run
-node bin/npx-vibe.js --check is-number
-node bin/npx-vibe.js --check esbuild
+## Landing page
+
+The static site lives in `site/` and is served from the `gh-pages` branch. Deploy a commit containing the site tree only, preserving the existing deployment branch history. Do not force-push or overwrite unrelated branch changes.
+
+Deploy after npm 3.0.0 is available so the installation examples resolve. Verify the homepage, styles, JavaScript, animations, guide, favicon, and llms.txt on the public URL.
+
+## Final checks
+
+```bash
+npm view npx-vibe version mcpName
+npx --yes npx-vibe@3.0.0 --version
+npx --yes npx-vibe@3.0.0 --agent is-number@7.0.0
 ```
 
-4. Commit and push the source release to `master`.
-5. Publish the landing page:
-
-```powershell
-git subtree push --prefix site origin gh-pages
-```
-
-6. Publish npm using a fresh authenticator code:
-
-```powershell
-npm publish --access public --otp=<current-6-digit-code>
-```
-
-The `prepublishOnly` script automatically runs syntax checks and tests before npm uploads the package.
-
-## Post-publish checks
-
-```powershell
-npm view npx-vibe version
-npx npx-vibe@latest --version
-npx npx-vibe@latest --check is-number
-```
-
-Verify:
-
-- npm: https://www.npmjs.com/package/npx-vibe
-- site: https://devrajsinh-jhala.github.io/NPM-Vibe-check/
-- CI: https://github.com/Devrajsinh-Jhala/NPM-Vibe-check/actions
-
-## Versioning
-
-Use semantic versioning:
-
-- patch: compatible fixes and detection tuning;
-- minor: compatible capabilities or new checks;
-- major: intentionally changed defaults, output contracts, or execution behavior.
-
-Never reuse a version already published to npm.
+Confirm npm, GitHub Release, MCP Registry version, website, and CI independently. A source push does not by itself publish npm or the MCP Registry. Ending maintenance does not require unpublishing releases or archiving the repository.

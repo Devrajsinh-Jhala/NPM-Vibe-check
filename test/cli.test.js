@@ -122,6 +122,7 @@ test("--agent rejects execution-oriented options and package arguments", () => {
   assert.throws(() => parseArgs(["--agent", "--force", "esbuild"], {}), /read-only/);
   assert.throws(() => parseArgs(["--agent", "--yes", "esbuild"], {}), /read-only/);
   assert.throws(() => parseArgs(["--agent", "--allow-install-scripts", "esbuild"], {}), /read-only/);
+  assert.throws(() => parseArgs(["approve-scripts", "--agent", "--write"], {}), /read-only/);
   assert.throws(() => parseArgs(["run", "--agent", "--force", "esbuild"], {}), /read-only/);
   assert.throws(() => parseArgs(["--agent", "typescript", "--", "--version"], {}), /only apply to/);
 });

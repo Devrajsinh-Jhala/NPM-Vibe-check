@@ -188,6 +188,7 @@ export function analyzePackage(snapshot, tarballInspection, options = {}) {
       lifecycleScripts: installScripts,
       publishScripts,
       advisoryCount: Array.isArray(snapshot.advisories) ? snapshot.advisories.length : 0,
+      advisoryStatus: snapshot.advisoryStatus ?? "checked",
       selectedFileCount: tarballInspection.selectedFiles?.length ?? 0,
       truncatedFileCount: (tarballInspection.selectedFiles ?? []).filter((file) => file.truncated).length,
       omittedFileCount: tarballInspection.omittedFileCount ?? 0,

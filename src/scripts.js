@@ -1,10 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { compareVersions, parseVersion } from "./spec.js";
+import { lockedArtifactKey, lockedDependency } from "./project.js";
+import { reviewCoverage } from "./coverage.js";
 
 // npm 12 records install-script permission in package.json as an object keyed by
 // either a bare package name or an exact name@version, with a boolean value:
 //   { "allowScripts": { "sharp": true, "esbuild@0.28.2": true, "shady": false } }
-// A bare name is the practical form: it survives a version bump without an edit.
+// New decisions are version-pinned: a reviewed release never authorises a future one.
 const ALLOW_FIELD = "allowScripts";
 
 // Findings that mean "do not run this at install time", full stop.
@@ -28,17 +30,15 @@ const REVIEW_CODES = new Set([
   "network_and_shell",
   "shell_in_install_hook",
   "transitive_install_script",
+  "too_many_archive_entries",
+  "large_unpacked_tarball",
+  "large_tarball",
 ]);
 
 // Local compilation toolchains. These build from source in the package directory
 // and reach the network only through the package manager that already ran.
 const NATIVE_BUILD_PATTERNS = [
-  /\bnode-gyp\s+(rebuild|build|configure)\b/i,
-  /\bnode-gyp-build\b/i,
-  /\bcargo-cp-artifact\b/i,
-  /\bnapi\s+build\b/i,
-  /\bneon\s+build\b/i,
-  /\bcmake-js\b/i,
+  /^(?:node-gyp\s+(?:rebuild|build|configure)|node-gyp-build|cargo-cp-artifact|napi\s+build|neon\s+build|cmake-js(?:\s+(?:build|compile|configure))?)(?:\s+--?[a-z][a-z0-9_-]*(?:=[a-z0-9._/-]+)?)*$/i,
 ];
 
 export function readAllowScripts(manifest) {
@@ -56,6 +56,7 @@ export function readAllowScripts(manifest) {
 
 export function resolveAllowState(allow, name, version) {
   const pinned = `${name}@${version}`;
+  if (allow.entries.get(name) === false || allow.entries.get(pinned) === false) return "denied";
   if (allow.entries.has(pinned)) {
     return allow.entries.get(pinned) ? "allowed" : "denied";
   }
@@ -81,23 +82,19 @@ export function collectPendingScriptPackages(project, options = {}) {
     if (!location || !entry || typeof entry !== "object") {
       continue;
     }
-    if (!entry.hasInstallScript || entry.link || entry.extraneous) {
+    if (!entry.hasInstallScript || entry.extraneous) {
       continue;
     }
     if (!location.includes("node_modules/")) {
       continue;
     }
-    if (!String(entry.resolved ?? "").toLowerCase().startsWith("http")) {
-      continue;
-    }
-
     const name = location.split("node_modules/").pop();
     const version = entry.version;
-    if (!name || !parseVersion(version)) {
+    if (!name) {
       continue;
     }
 
-    const key = `${name}@${version}`;
+    const key = lockedArtifactKey(name, entry);
     if (collected.has(key)) {
       continue;
     }
@@ -105,14 +102,16 @@ export function collectPendingScriptPackages(project, options = {}) {
       name,
       version,
       location,
-      packageSpec: key,
+      resolved: entry.resolved ?? null,
+      ...lockedDependency({ name, requested: String(version ?? "unknown"), groups: [] }, entry, options),
       dev: Boolean(entry.dev),
       allowState: resolveAllowState(allow, name, version),
     });
   }
 
   return [...collected.values()].sort((left, right) =>
-    left.name.localeCompare(right.name) || compareVersions(left.version, right.version)
+    left.name.localeCompare(right.name) || (parseVersion(left.version) && parseVersion(right.version)
+      ? compareVersions(left.version, right.version) : String(left.version).localeCompare(String(right.version)))
   );
 }
 
@@ -173,19 +172,20 @@ export function classifyInstallScripts(result) {
   }
 
   if (!scripts.length) {
-    // The lockfile flagged an install script but the manifest declares none, which
-    // means npm is running an implicit node-gyp rebuild from a binding.gyp file.
-    reasons.push("No declared install script; npm compiles from binding.gyp only.");
-    return { decision: "approve", reasons, hosts: [], scripts, evidence: [] };
+    reasons.push("Lockfile flags install-time code but no declared script was inspected. Review implicit native builds and binding.gyp manually.");
+    return { decision: "review", reasons, hosts: [], scripts, evidence: [] };
+  }
+  if (result?.stats?.truncatedFileCount || result?.stats?.omittedFileCount) {
+    reasons.push("Selected source exceeded the review budget. Partial source inspection cannot automatically approve install scripts.");
+    return { decision: "review", reasons, hosts: networkHosts(result), scripts, evidence: [] };
   }
 
   // Every segment of every command has to be a recognised local build tool. A
   // containment test is not enough: `prebuild-install || node-gyp rebuild` reads
   // as a build command but its first branch downloads a binary over the network.
   const buildOnly = scripts.every((script) =>
-    commandSegments(script.command).every((segment) =>
-      NATIVE_BUILD_PATTERNS.some((pattern) => pattern.test(segment))
-    )
+    !/[\n\r`$<>&]/.test(script.command) && commandSegments(script.command).length > 0
+      && commandSegments(script.command).every((segment) => NATIVE_BUILD_PATTERNS.some((pattern) => pattern.test(segment)))
   );
   if (buildOnly) {
     reasons.push("Install scripts only invoke a local native build toolchain.");
@@ -239,11 +239,11 @@ export async function reviewScriptApprovals(project, options, reviewer) {
   if (typeof reviewer !== "function") {
     throw new Error("Script approval review requires a package reviewer.");
   }
-  if (!project.lockfile) {
+  if (!project.lockfile?.packages || typeof project.lockfile.packages !== "object" || Array.isArray(project.lockfile.packages)) {
     throw new Error(
       project.lockfileError
         ? `approve-scripts needs a readable package-lock.json: ${project.lockfileError}`
-        : "approve-scripts needs a package-lock.json next to package.json. Run npm install first."
+        : "approve-scripts needs a package-lock.json with a packages map (npm lockfile v2/v3). Run npm install --package-lock-only --ignore-scripts first."
     );
   }
 
@@ -254,16 +254,23 @@ export async function reviewScriptApprovals(project, options, reviewer) {
 
   await mapConcurrent(targets, Number(options.projectConcurrency ?? 3), async (target, index) => {
     try {
+      if (!target.packageSpec) throw new Error(target.reason);
       const reviewed = await reviewer(target.packageSpec, {
         ...options,
         githubMetadata: false,
         check: true,
+        lockedIntegrity: target.integrity,
       });
+      const classification = classifyInstallScripts(reviewed.result);
+      if (classification.decision === "approve" && !target.resolved) {
+        classification.decision = "review";
+        classification.reasons = ["Lockfile has no resolved URL; npm cannot enforce a version-pinned approval. Refresh the lockfile and review again."];
+      }
       packages[index] = {
         ...target,
         verdict: reviewed.result.verdict,
         findings: reviewed.result.findings,
-        ...classifyInstallScripts(reviewed.result),
+        ...classification,
       };
     } catch (error) {
       errors.push({ name: target.name, version: target.version, message: error.message });
@@ -289,6 +296,9 @@ export async function reviewScriptApprovals(project, options, reviewer) {
   return {
     kind: "script-approvals",
     verdict,
+    coverage: reviewCoverage({ scope: options.all ? "all-install-scripts" : "pending-install-scripts",
+      requested: targets.length, scanned: completed.length, failed: errors.length,
+      reasons: errors.map((entry) => `${entry.name}: ${entry.message}`) }),
     project: {
       name: project.manifest.name ?? null,
       version: project.manifest.version ?? null,
@@ -324,15 +334,15 @@ export function scriptApprovalExitCode(report) {
 // Only unambiguous outcomes are written. A "review" package stays pending on
 // purpose: the whole point of the command is that a person decides those, and
 // silently writing them would recreate the rubber-stamp the allowlist replaced.
-export function buildAllowScriptsPatch(report, options = {}) {
-  const pin = Boolean(options.pin);
+export function buildAllowScriptsPatch(report) {
   const additions = new Map();
 
   for (const entry of report.packages) {
     if (entry.decision === "approve") {
-      additions.set(pin ? entry.packageSpec : entry.name, true);
+      const key = entry.packageSpec ?? `${entry.name}@${entry.version}`;
+      if (additions.get(key) !== false) additions.set(key, true);
     } else if (entry.decision === "deny") {
-      additions.set(pin ? entry.packageSpec : entry.name, false);
+      additions.set(entry.packageSpec ?? `${entry.name}@${entry.version}`, false);
     }
   }
 
@@ -351,9 +361,14 @@ export function applyAllowScripts(manifestPath, additions) {
     : {};
 
   const merged = { ...existing };
+  let count = 0;
   for (const [key, value] of additions) {
+    const name = key.slice(0, key.lastIndexOf("@"));
+    if (value === true && (existing[key] === false || existing[name] === false)) continue;
     merged[key] = value;
+    count += 1;
   }
+  if (!count) return { written: false, reason: "Existing denied permissions were preserved; no entries changed." };
   manifest[ALLOW_FIELD] = Object.fromEntries(
     Object.entries(merged).sort(([left], [right]) => left.localeCompare(right))
   );
@@ -362,7 +377,7 @@ export function applyAllowScripts(manifestPath, additions) {
   const trailingNewline = raw.endsWith("\n") ? "\n" : "";
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, indent)}${trailingNewline}`, "utf8");
 
-  return { written: true, count: additions.size, field: ALLOW_FIELD };
+  return { written: true, count, field: ALLOW_FIELD };
 }
 
 function detectIndent(raw) {
